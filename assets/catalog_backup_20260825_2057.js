@@ -37,50 +37,6 @@ async function fetchT(url, tries = 2) {
   throw lastErr || new Error('fetch failed');
 }
 
-/* ---------- IndexedDB cache: the 7MB catalog JSONs land once,
-   then every visit loads from disk in milliseconds ---------- */
-const CATALOG_TTL = 12 * 3600 * 1000;
-function idb() {
-  return new Promise((res, rej) => {
-    const rq = indexedDB.open('prism-cache', 1);
-    rq.onupgradeneeded = () => rq.result.createObjectStore('kv');
-    rq.onsuccess = () => res(rq.result);
-    rq.onerror = () => rej(rq.error);
-  });
-}
-async function idbGet(key) {
-  try {
-    const d = await idb();
-    return await new Promise((res, rej) => {
-      const t = d.transaction('kv').objectStore('kv').get(key);
-      t.onsuccess = () => res(t.result);
-      t.onerror = () => rej(t.error);
-    });
-  } catch { return null; }
-}
-async function idbSet(key, val) {
-  try {
-    const d = await idb();
-    await new Promise((res, rej) => {
-      const t = d.transaction('kv', 'readwrite');
-      t.objectStore('kv').put(val, key);
-      t.onsuccess = () => res();
-      t.onerror = () => rej(t.error);
-    });
-  } catch {}
-}
-
-async function cachedJson(key, url) {
-  const hit = await idbGet('cat:' + key);
-  if (hit && (Date.now() - hit.t) < CATALOG_TTL && hit.body) {
-    return JSON.parse(hit.body);
-  }
-  const res = await fetchT(url);
-  const body = await res.text();
-  idbSet('cat:' + key, { t: Date.now(), body }); // fire-and-forget
-  return JSON.parse(body);
-}
-
 /* Brand extraction (simplified from proven tree.js): ABC News Live 3 -> ABC NEWS LIVE */
 const QUALIFIERS = new Set(['PLUS', 'EXTRA', 'HD', 'FHD', 'SD', 'UHD', '4K', '8K', 'EAST', 'WEST', 'NORTH', 'SOUTH', 'FEED']);
 const NUMBERY = /^\+?\d+(\.\d+)?$/;
@@ -193,11 +149,12 @@ export function hierarchy(channels) {
 /* main loader: onProgress(stage string) fires as it goes */
 export async function loadCatalog(onProgress = () => {}) {
   onProgress('fetching channel index…');
-  const [channelsData, streamsData] = await Promise.all([
-    cachedJson('channels', `${API}/channels.json`),
-    cachedJson('streams', `${API}/streams.json`),
+  const [chRes, stRes] = await Promise.all([
+    fetchT(`${API}/channels.json`),
+    fetchT(`${API}/streams.json`),
   ]);
   onProgress('parsing catalog…');
+  const [channelsData, streamsData] = [await chRes.json(), await stRes.json()];
   onProgress(`indexing ${streamsData.length.toLocaleString()} streams…`);
   db.totalIndexed = channelsData.length;
 
