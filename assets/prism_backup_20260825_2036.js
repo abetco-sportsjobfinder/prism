@@ -3,7 +3,7 @@
    No filters, no search, no sort, no multi-player, no chrome.
    ============================================================ */
 
-import { loadCatalog, db, countries, categories, getStatus, hasStream, pickStream } from './catalog.js';
+import { loadCatalog, db, countries, getStatus, hasStream, pickStream } from './catalog.js';
 
 const CDN = {
   hls: 'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js',
@@ -27,9 +27,7 @@ function loadScript(src) {
 }
 const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-/* the REAL sportsbook-jobs loader (DashboardClient.tsx:209) — ring + shimmer, verbatim values */
-const chipHTML = '<span class="sb-ring"></span>';
-const sbLoader = (label) => `<span class="sb-load">${chipHTML}<span class="sb-label">${esc(label)}</span><span class="sb-shimmer"><i></i></span></span>`;
+const chipHTML = '<span class="poker-chip"><i></i></span>';
 const proxied = url => `${PROXY}?u=${encodeURIComponent(url)}`;
 function rawOf(u) {
   try {
@@ -186,7 +184,19 @@ function rowFor(ch, onPlay) {
   return b;
 }
 
-
+function refreshLogos(list) {
+  list.querySelectorAll('.ch-row[data-id]').forEach(row => {
+    const id = row.dataset.id;
+    const url = logoFor(id);
+    if (!url || row.querySelector('.ch-logo')) return;
+    const img = el('img', 'ch-logo');
+    img.loading = 'lazy';
+    img.alt = '';
+    img.addEventListener('error', () => img.replaceWith(document.createTextNode('')), { once: true });
+    img.src = url;
+    row.insertBefore(img, row.querySelector('.ch-name'));
+  });
+}
 
 /* ================= bootstrap ================= */
 export function mountPrism({ target, title = 'prism' } = {}) {
@@ -195,16 +205,11 @@ export function mountPrism({ target, title = 'prism' } = {}) {
   const stage = el('div', 'stage');
 
   const bar = el('div', 'list-bar');
-  const listStatus = el('span', null, sbLoader('LOADING EVERY CHANNEL…'));
-  const workLbl = el('label', 'tree-working');
-  workLbl.innerHTML = '<input type="checkbox" id="workChk" checked /> WORKING';
-  const sortSel = el('select', 'sort-select');
-  sortSel.innerHTML = '<option value="az" selected>A–Z</option><option value="category">CATEGORY</option>';
+  const listStatus = el('span', null, `${chipHTML} LOADING EVERY CHANNEL…`);
   const cSel = el('select', 'country-select');
   cSel.innerHTML = '<option value="all">🌍 ALL</option>';
-  const minBtn = el('button', 'caret-btn', '<i class="fas fa-chevron-down"></i>');
-  minBtn.title = 'Minimize / expand channel list';
-  bar.append(listStatus, workLbl, sortSel, cSel, minBtn);
+  const minBtn = el('button', 'min-btn', '▾ CHANNELS');
+  bar.append(listStatus, cSel, minBtn);
 
   const list = el('div', 'ch-list');
   target.append(stage, bar, list);
@@ -212,30 +217,16 @@ export function mountPrism({ target, title = 'prism' } = {}) {
   const player = createPlayer({ stage });
 
   let ALL = [];
-  let CUR = [];
+  let CUR = [];                 // country-filtered view of ALL
   let rendered = 0;
   let minimized = false;
-  let workingOnly = true;
-  let sortMode = 'az';
   const sentinel = el('div', 'list-sentinel');
   const io = new IntersectionObserver(entries => {
     if (entries.some(e => e.isIntersecting)) appendChunk();
   }, { rootMargin: '900px' });
 
-  function filtered() {
-    let out = ALL;
-    if (cSel.value !== 'all') out = out.filter(c => c.country === cSel.value);
-    if (workingOnly) out = out.filter(c => hasStream(c.id) && getStatus(c.id) === 'working');
-    return sortMode === 'az'
-      ? [...out].sort((a, b) => a.name.localeCompare(b.name))
-      : [...out].sort((a, b) => {
-          const ca = (a.categories || [])[0] || 'zzz', cb = (b.categories || [])[0] || 'zzz';
-          return ca.localeCompare(cb) || a.name.localeCompare(b.name);
-        });
-  }
-
   function appendChunk() {
-    if (minimized || sortMode !== 'az' || rendered >= CUR.length) return;
+    if (minimized || rendered >= CUR.length) return;
     const frag = document.createDocumentFragment();
     const end = Math.min(rendered + CHUNK, CUR.length);
     for (let i = rendered; i < end; i++) frag.appendChild(rowFor(CUR[i], ch => player.playChannel(ch)));
@@ -244,81 +235,28 @@ export function mountPrism({ target, title = 'prism' } = {}) {
     listStatus.textContent = `${CUR.length.toLocaleString()} CHANNELS · showing ${rendered.toLocaleString()} · scroll for more`;
   }
 
-  function gcard(ch) {
-    const st = getStatus(ch.id);
-    const stream = hasStream(ch.id);
-    const card = el('button', 'gcard' + (stream ? '' : ' dead'));
-    const logo = logoFor(ch.id) || flagFor(ch.country);
-    card.innerHTML = `
-      <span class="gcard-media">${logo
-        ? `<img loading="lazy" src="${esc(logo)}" onerror="this.replaceWith(document.createTextNode(''))" alt="">`
-        : esc((ch.name || '?')[0].toUpperCase())}</span>
-      <span class="gcard-name">${esc(ch.name)}</span>
-      <span class="dot ${st}${stream ? '' : ' none'}"></span>`;
-    card.title = ch.name;
-    card.addEventListener('click', () => {
-      if (!stream) { toast(`NO STREAM FOR ${ch.name.toUpperCase().slice(0, 24)}`); return; }
-      player.playChannel(ch);
-    });
-    return card;
-  }
-
-  function renderCategory() {
-    list.querySelectorAll('.cat-wrap, .ch-row').forEach(n => n.remove());
-    const wrap = el('div', 'cat-wrap');
-    const byCat = new Map();
-    for (const c of CUR) {
-      const cats = (c.categories || []).filter(Boolean);
-      for (const k of (cats.length ? cats.slice(0, 2) : ['general'])) {
-        if (!byCat.has(k)) byCat.set(k, []);
-        byCat.get(k).push(c);
-      }
-    }
-    const order = ['sports', 'news', 'movies', 'kids', 'music', 'entertainment', 'documentary', 'series', 'general'];
-    const entries = [...byCat.entries()].sort((a, b) => {
-      const ia = order.indexOf(a[0]), ib = order.indexOf(b[0]);
-      return ((ia >= 0 ? ia : 99) - (ib >= 0 ? ib : 99)) || (b[1].length - a[1].length);
-    });
-    for (const [cat, chans] of entries) {
-      const row = el('div', 'guide-row');
-      row.appendChild(el('div', 'guide-row-title',
-        `${esc(cat.toUpperCase())} <span class="count">${chans.length}</span>`));
-      const strip = el('div', 'guide-cards');
-      for (const ch of chans.slice(0, 24)) strip.appendChild(gcard(ch));
-      row.appendChild(strip);
-      wrap.appendChild(row);
-    }
-    if (!wrap.children.length)
-      wrap.innerHTML = '<div class="tree-empty">No channels match.</div>';
-    list.insertBefore(wrap, sentinel);
-  }
-
-  function refreshView() {
-    CUR = filtered();
+  function applyCountry(cc) {
+    CUR = cc === 'all' ? ALL : ALL.filter(c => c.country === cc);
     rendered = 0;
-    list.querySelectorAll('.ch-row, .cat-wrap').forEach(n => n.remove());
-    if (minimized) { listStatus.textContent = `${CUR.length.toLocaleString()} CHANNELS`; return; }
-    if (sortMode === 'category') { renderCategory(); listStatus.textContent = `${CUR.length.toLocaleString()} CHANNELS BY CATEGORY`; }
-    else { io.observe(sentinel); appendChunk(); }
+    list.querySelectorAll('.ch-row').forEach(r => r.remove());
+    if (!minimized) appendChunk();
+    else listStatus.textContent = `${CUR.length.toLocaleString()} CHANNELS`;
   }
 
+  /* minimize toggle */
   minBtn.addEventListener('click', () => {
     minimized = !minimized;
     list.classList.toggle('min', minimized);
-    minBtn.querySelector('i').className =
-      `fas fa-chevron-${minimized ? 'up' : 'down'}`;
+    minBtn.textContent = (minimized ? '▸' : '▾') + ' CHANNELS';
     if (minimized) {
       io.disconnect();
       listStatus.textContent = `${CUR.length.toLocaleString()} CHANNELS`;
     } else {
-      refreshView();
+      io.observe(sentinel);
+      appendChunk();
     }
   });
-  cSel.addEventListener('change', refreshView);
-  workLbl.querySelector('#workChk').addEventListener('change', e => {
-    workingOnly = e.target.checked; refreshView();
-  });
-  sortSel.addEventListener('change', e => { sortMode = e.target.value; refreshView(); });
+  cSel.addEventListener('change', () => applyCountry(cSel.value));
 
   (async () => {
     try {
@@ -332,19 +270,9 @@ export function mountPrism({ target, title = 'prism' } = {}) {
           .map(([code, n]) => `<option value="${code}">${code.toUpperCase()} (${n.toLocaleString()})</option>`).join(''));
       listStatus.textContent = '';
       list.appendChild(sentinel);
-      refreshView();
-      requestLogos(() => {
-        refreshView();
-        list.querySelectorAll('.ch-row[data-id]').forEach(row => {
-          const url = logoFor(row.dataset.id);
-          if (url && !row.querySelector('.ch-logo')) {
-            const img = el('img', 'ch-logo'); img.loading = 'lazy'; img.alt = '';
-            img.addEventListener('error', () => img.replaceWith(document.createTextNode('')), { once: true });
-            img.src = url;
-            row.insertBefore(img, row.querySelector('.ch-name'));
-          }
-        });
-      });
+      io.observe(sentinel);
+      appendChunk();
+      requestLogos(() => refreshLogos(list));
     } catch (e) {
       listStatus.textContent = `⚠ catalog failed: ${e.message}`;
     }

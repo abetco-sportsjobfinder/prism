@@ -64,6 +64,24 @@ body {
 }
 
 /* ---------- casino-chip spinner ---------- */
+@keyframes chipSpin { to { transform: rotate(360deg); } }
+.poker-chip {
+  position: relative; display: inline-block;
+  width: 46px; height: 46px; border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #0d1320 0 34%, transparent 34%),
+    conic-gradient(#FFD600 0 30deg, #090D14 30deg 60deg, #FFD600 60deg 90deg, #090D14 90deg 120deg,
+                   #FFD600 120deg 150deg, #090D14 150deg 180deg, #FFD600 180deg 210deg, #090D14 210deg 240deg,
+                   #FFD600 240deg 270deg, #090D14 270deg 300deg, #FFD600 300deg 330deg, #090D14 330deg 360deg);
+  border: 3px solid #FFD600;
+  box-shadow: 0 0 16px rgba(255,214,0,.45), inset 0 0 10px rgba(0,0,0,.7);
+  animation: chipSpin 1.15s linear infinite;
+}
+.poker-chip i {
+  position: absolute; inset: 22%; border-radius: 50%;
+  background: radial-gradient(circle, #101725 55%, #00B8D4 56%, #090D14 78%);
+  box-shadow: inset 0 0 6px rgba(0,184,212,.6);
+}
 
 /* ---------- channel list ---------- */
 .list-status {
@@ -138,58 +156,3 @@ option { background: #070B0F; color: var(--text-light); }
   .list-bar { flex-wrap: wrap; }
   .country-select, .min-btn { min-height: 42px; font-size: 13px; }
 }
-
-
-/* ---------- R3: real sb-ring loader, caret minimize, category rows ---------- */
-
-/* VERBATIM from sportsbook-jobs-dashboard DashboardClient.tsx:209-216 */
-.sb-ring {
-  display: inline-block; width: 40px; height: 40px;
-  border: 3px solid rgba(0,184,212,0.15); border-top-color: #00B8D4;
-  border-radius: 50%; animation: sb-spin 0.8s linear infinite;
-}
-@keyframes sb-spin { to { transform: rotate(360deg); } }
-.sb-load { display: inline-flex; align-items: center; gap: 12px; }
-.sb-label { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
-.sb-shimmer {
-  position: relative; width: 120px; height: 8px; overflow: hidden;
-  background: rgba(0,184,212,0.15); border-radius: 2px;
-}
-.sb-shimmer i {
-  position: absolute; top: 0; left: 0; height: 100%; width: 30%;
-  background: linear-gradient(90deg, #00B8D4, #00D4FF);
-  border-radius: 2px; animation: sb-shimmer 1.5s ease-in-out infinite;
-}
-@keyframes sb-shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }
-
-.caret-btn {
-  background: var(--bg-darker); border: 1px solid var(--border-color);
-  color: var(--accent-primary); cursor: pointer;
-  min-width: 40px; min-height: 38px; border-radius: 6px; font-size: 13px;
-  transition: all .2s; flex-shrink: 0;
-}
-.caret-btn:hover { background: rgba(0,184,212,.25); }
-@media (max-width:640px) { .caret-btn { min-width: 44px; min-height: 42px; } }
-
-/* category card rows (inside the single list area) */
-.guide-row { margin-top: 4px; }
-.guide-row-title {
-  padding: 10px 14px 4px; font-size: 11px; letter-spacing: 1.5px;
-  color: var(--text-muted); text-transform: uppercase;
-}
-.guide-row-title .count { color: var(--accent-primary); }
-.guide-cards { display: flex; gap: 10px; overflow-x: auto; padding: 2px 14px 12px; scroll-snap-type: x proximity; }
-.guide-cards::-webkit-scrollbar { height: 6px; }
-.gcard {
-  flex: 0 0 148px; scroll-snap-align: start; position: relative;
-  display: flex; flex-direction: column; align-items: center; gap: 7px;
-  background: #12151d; border: 1px solid var(--border-color); border-radius: 12px;
-  padding: 10px 8px 8px; cursor: pointer; transition: all .18s; min-height: 106px;
-}
-.gcard:hover { border-color: var(--accent-primary); transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0,184,212,.25); }
-.gcard-media { height: 42px; width: 100%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; color: var(--text-muted); }
-.gcard-media img { max-height: 42px; max-width: 92%; object-fit: contain; }
-.gcard-name { font-size: 11px; line-height: 1.25; text-align: center; color: var(--text-light); max-height: 28px; overflow: hidden; }
-.gcard .dot { position: absolute; top: 7px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: #39424f; }
-.gcard .dot.working { background: #00ff88; box-shadow: 0 0 5px rgba(0,255,136,.7); }
-.gcard.dead { opacity: .55; }
