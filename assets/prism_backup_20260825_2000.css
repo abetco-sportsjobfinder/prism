@@ -528,33 +528,3 @@ option { background: #070B0F; color: var(--text-light); }
   font-family: inherit; font-size: 12px; font-weight: 700;
   padding: 8px 16px; letter-spacing: .5px;
 }
-
-
-/* ---------- Piece 008 ---------- */
-.dock-menu-btn {
-  margin-left: 4px;
-  background: var(--menu-bg); border: 1px solid var(--border-color);
-  color: var(--text-light); font-family: inherit; font-size: 12px; font-weight: 700;
-  letter-spacing: 1px; min-height: 40px; padding: 0 14px;
-  border-radius: 6px; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 7px;
-  transition: all .2s; flex-shrink: 0;
-}
-.dock-menu-btn:hover { background: rgba(0,184,212,.3); }
-#dockCaret { margin-left: 2px; }
-
-.dock.autohidden { transform: translateY(102%); }
-.dock { transition: transform .3s ease; }
-body { transition: padding-bottom .3s ease; }
-
-/* drawer: ~2 card rows visible, vertical scroll for the rest */
-.dock.open .dock-sheet { max-height: min(340px, 58vh); overflow-y: auto; }
-.cat-rows { display: block; }
-.tree-box { display: none; }
-
-.pwin.solo-win { border-radius: 12px; box-shadow: 0 10px 34px rgba(0,184,212,.25); }
-
-@media (max-width: 820px) {
-  .dock-menu-btn { min-height: 44px; }
-  .dock.open .dock-sheet { max-height: min(360px, 62vh); }
-}

@@ -1,17 +1,16 @@
 /* ============================================================
-   PRISM — independent, embeddable AV module. Piece 008.
-   • ONE bottom control strip: α brand · layout select · ☰ GUIDE
-     toggle · + PLAYER · CLOSE ALL · caret. No plugins/presets UI.
-   • Single collapsible drawer: search + SORT (A–Z / CATEGORY /
-     COUNTRY) + WORKING. CATEGORY = horizontal logo-card rows
-     (~2 visible, vertical scroll through all). A–Z/COUNTRY =
-     bracket tree with ★ favorites pinned.
-   • Stage auto-hides nothing: players snap-lock (14px intent
-     dead-zone), grid select materializes idle containers,
-     solo+FREE = near-fullscreen player.
-   • Footer auto-hides after 4s idle (all devices), returns on any
-     pointer/touch/key activity, and never hides while drawer open.
-   • Last-stream memory; streams proxied once through worker.
+   PRISM — independent, embeddable AV module. Piece 007.
+   Fixes/changes this piece:
+   • Snap-locked windows: 14px drag dead-zone; drop near slot = re-lock
+   • Grid select MATERIALIZES empty players up to the slot count
+   • Channel tap = replace focused player; ＋ on a row = NEW player
+   • All catalog streams proxied through the worker (fixes silent
+     http/mixed-content failures like DraftKings Network)
+   • SOURCE popover smart-flips / centers — never off-screen
+   • Dock bar: no horizontal overflow on phones, persistent caret,
+     restyled α mark, dark-legible <select> options
+   • Spinning-α loader everywhere; last-stream memory; TV GUIDE
+     compact-on-load with MINI/COMPACT/FULL modes (unchanged DNA)
    ============================================================ */
 
 import { loadCatalog, query, countries, categories, stats, getStatus, hasStream, pickStream } from './catalog.js';
@@ -41,16 +40,9 @@ function loadScript(src) {
 }
 const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-/* casino-chip spinner */
+/* spinning ALPHA loader (ABET live-odds motif) */
 const chip = (size = '') => `<span class="poker-chip ${size}"><i></i></span>`;
 const proxied = url => `${PROXY}?u=${encodeURIComponent(url)}`;
-function rawOf(u) {
-  try {
-    if (typeof u === 'string' && u.startsWith(PROXY + '?u='))
-      return decodeURIComponent(new URL(u).searchParams.get('u') || '');
-  } catch {}
-  return u;
-}
 
 function getLast() { try { return JSON.parse(localStorage.getItem(LAST_KEY)) || null; } catch { return null; } }
 function setLast(url, name) { try { localStorage.setItem(LAST_KEY, JSON.stringify({ url, name: name || '', t: Date.now() })); } catch {} }
@@ -84,30 +76,37 @@ function requestLogos(onReady) {
 const logoFor = id => logoMap.get(id) || '';
 const flagFor = cc => cc?.length === 2 ? `https://flagcdn.com/w40/${cc.toLowerCase()}.png` : '';
 
-/* ---------------- popovers ---------------- */
+/* ---------------- popovers (smart placement) ---------------- */
 let openPopover = null;
 function closeOpenPopover() { if (openPopover) { openPopover.remove(); openPopover = null; } }
 document.addEventListener('pointerdown', e => { if (openPopover && !openPopover.contains(e.target)) closeOpenPopover(); }, true);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOpenPopover(); });
+
 function showSmart(anchor, node) {
   closeOpenPopover();
   document.body.appendChild(node);
+
+  const mobile = matchMedia('(max-width:820px)').matches;
   const vw = innerWidth, vh = innerHeight;
   let w = Math.max(320, Math.round(anchor.getBoundingClientRect().width));
   w = Math.min(w, vw - 20);
   node.style.width = `${w}px`;
-  node.style.visibility = 'hidden'; node.style.display = 'block';
+
+  /* measure hidden, then place: above → flip below → mobile centered */
+  node.style.visibility = 'hidden';
+  node.style.display = 'block';
   const nh = node.offsetHeight;
   const r = anchor.getBoundingClientRect();
   node.style.visibility = '';
+
   let left, top;
-  if (matchMedia('(max-width:820px)').matches) {
+  if (mobile) {
     left = (vw - w) / 2;
     top = Math.max(12, (vh - nh) / 2 - 40);
   } else {
     left = Math.max(10, Math.min(r.left, vw - w - 10));
-    top = r.top - nh - 10;
-    if (top < 10) top = r.bottom + 10;
+    top = r.top - nh - 10;                       // prefer above (dock is below)
+    if (top < 10) top = r.bottom + 10;           // flip below when near top
     if (top + nh > vh - 10) top = Math.max(10, vh - nh - 10);
   }
   node.style.left = `${Math.round(left)}px`;
@@ -129,7 +128,7 @@ export function createSourceMenu(win, anchorBtn) {
     </div>
     <input type="file" accept="video/*,audio/*,.mkv,.m3u8" style="display:none" />
     <div class="menu-divider"></div>
-    <div class="popover-hint">Or tap a channel in the GUIDE drawer.</div>`;
+    <div class="popover-hint">Or tap a channel in the docks. Tap name = replace · ＋ = new window.</div>`;
   const input = menu.querySelector('.url-input');
   menu.querySelector('[data-act="play"]').addEventListener('click', () => {
     const v = input.value.trim(); if (!v) return;
@@ -151,9 +150,46 @@ export function createSourceMenu(win, anchorBtn) {
   });
 }
 
+export function createPresetMenu(getWin, anchorBtn) {
+  const menu = el('div', 'popover');
+  const render = () => {
+    const presets = getPresets();
+    menu.innerHTML = `
+      <div class="strip-title"><i class="fas fa-plug" style="color:var(--accent-primary)"></i>SAVED SOURCES</div>
+      <div class="preset-list">${presets.length ? presets.map((p, i) => `
+        <div class="preset-row" data-i="${i}">
+          <button class="preset-name">${esc(p.name)}</button><button class="preset-del">✕</button>
+        </div>`).join('') : '<div class="popover-hint">Nothing saved yet.</div>'}</div>
+      <div class="save-row">
+        <input class="preset-name-input" maxlength="40" placeholder="Name for FOCUSED stream…" />
+        <button class="strip-btn primary" data-act="save">SAVE</button>
+      </div>`;
+    menu.querySelectorAll('.preset-name').forEach(b => b.addEventListener('click', () => {
+      const p = getPresets()[+b.closest('.preset-row').dataset.i];
+      if (p) { getWin().load(p.url); closeOpenPopover(); }
+    }));
+    menu.querySelectorAll('.preset-del').forEach(b => b.addEventListener('click', () => {
+      const l = getPresets(); l.splice(+b.closest('.preset-row').dataset.i, 1); savePresets(l); render();
+    }));
+    menu.querySelector('[data-act="save"]').addEventListener('click', () => {
+      const url = getWin().currentUrl;
+      if (!url) { toast('Nothing is playing yet'); return; }
+      const list = getPresets();
+      list.unshift({ name: menu.querySelector('.preset-name-input').value.trim() || url.split('/').pop().slice(0, 32), url });
+      savePresets(list); render();
+    });
+  };
+  anchorBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (openPopover === menu) { closeOpenPopover(); return; }
+    render(); showSmart(anchorBtn, menu);
+  });
+}
+
 /* ================= player window ================= */
 let zTop = 500;
 
+/* group channels into Map<group, Map<brand, channel[]>> for any sort mode */
 function groupChannels(list, mode) {
   const top = new Map();
   const put = (g, c) => {
@@ -187,7 +223,7 @@ export function createWindow({ stage, title = 'LIVE', idle = false }) {
       </span>
     </div>
     <video controls playsinline preload="metadata"></video>
-    <div class="pwin-idle">${chip('big')}<span>PICK A CHANNEL BELOW</span></div>
+    <div class="pwin-idle"><span class="alpha-spin big idle-a">α</span><span>PICK A CHANNEL</span></div>
     <div class="pwin-loading" style="display:none">${chip()}</div>
     <div class="pwin-err"></div>`;
   stage.appendChild(cell);
@@ -197,14 +233,17 @@ export function createWindow({ stage, title = 'LIVE', idle = false }) {
   const loading = cell.querySelector('.pwin-loading');
   const idleEl = cell.querySelector('.pwin-idle');
 
-  let engine = null, objectUrl = null, currentUrl = '', engineLabel = idle ? '—' : '';
+  let engine = null, objectUrl = null, currentUrl = '', engineLabel = '—';
+  let isEmpty = !!idle;
 
   const fail = m => { errEl.textContent = m; errEl.classList.add('show'); toast(m); loading.style.display = 'none'; };
+
   const isIdle = () => idleEl.style.display !== 'none';
   video.addEventListener('waiting', () => { if (!isIdle()) loading.style.display = ''; });
   video.addEventListener('playing', () => { loading.style.display = 'none'; });
   video.addEventListener('canplay', () => { if (!isIdle()) loading.style.display = 'none'; });
 
+  /* autoplay policy: retry muted, offer one-tap sound */
   function attemptPlay() {
     const p = video.play();
     if (!p) return;
@@ -228,7 +267,9 @@ export function createWindow({ stage, title = 'LIVE', idle = false }) {
     idleEl.style.display = 'none';
     errEl.classList.remove('show'); teardown();
 
-    let kind = opts.kind, target = src;
+    /* route public streams through our worker: CORS + http-upgrade + referer */
+    let kind = opts.kind;
+    let target = src;
     if (!opts.isFile && typeof src === 'string') {
       kind = kind || (/\.mpd($|\?)/i.test(src) ? 'dash' : (/\.m3u8($|\?)/i.test(src) ? 'hls' : 'native'));
       target = proxied(src);
@@ -272,6 +313,7 @@ export function createWindow({ stage, title = 'LIVE', idle = false }) {
     close() { api.onDestroy?.(api); api.destroy(); },
     destroy() { teardown(); cell.remove(); },
   };
+  if (idle) { engineLabel = '—'; }
 
   bar_drag(api, cell.querySelector('.pwin-bar'), stage);
   cell.addEventListener('pointerdown', () => api.focus());
@@ -289,20 +331,9 @@ export function createWindow({ stage, title = 'LIVE', idle = false }) {
   return api;
 }
 
-function showMuteBadge(cell) {
-  if (!cell || cell.querySelector('.mute-badge')) return;
-  const b = el('button', 'mute-badge', '🔇 TAP FOR SOUND');
-  b.addEventListener('click', e => {
-    e.stopPropagation();
-    const v = cell.querySelector('video');
-    if (v) { v.muted = false; v.volume = Math.max(v.volume, .8); }
-    b.remove();
-  });
-  cell.appendChild(b);
-}
-
-const DRAG_THRESHOLD = 14;
-const SNAP_RETURN = 34;
+/* drag with intent-dead-zone + snap-back-to-slot */
+const DRAG_THRESHOLD = 14;   // px of movement before a drag engages
+const SNAP_RETURN = 30;      // px near slot to re-lock
 
 function bar_drag(api, bar, stage) {
   bar.addEventListener('pointerdown', e => {
@@ -310,35 +341,39 @@ function bar_drag(api, bar, stage) {
     api.focus();
     const r = api.cell.getBoundingClientRect(), s = stage.getBoundingClientRect();
     const ox = e.clientX - r.left, oy = e.clientY - r.top;
-    const startX = e.clientX, startY = e.clientY;
     let engaged = false;
 
     const move = ev => {
+      const dx = ev.clientX - (s.left + ox), dy = ev.clientY - (s.top + oy);
       if (!engaged && Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD) return;
       engaged = true;
       api.cell.classList.add('dragging');
-      api.cell.style.left = `${Math.max(0, Math.min(ev.clientX - s.left - ox, s.width - 56))}px`;
-      api.cell.style.top = `${Math.max(0, Math.min(ev.clientY - s.top - oy, s.height - 44))}px`;
+      api.cell.style.left = `${Math.max(0, Math.min(dx, s.width - 56))}px`;
+      api.cell.style.top = `${Math.max(0, Math.min(dy, s.height - 44))}px`;
       api.cell.classList.add('free');
       api.cell.classList.remove('snapped');
     };
+    const startX = e.clientX, startY = e.clientY;
+
     const up = () => {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up);
       api.cell.classList.remove('dragging');
-      if (api.cell.dataset.slotL !== undefined && engaged) {
+      /* snap-back: released near its grid slot → re-lock */
+      if (api.cell.dataset.slotL !== undefined) {
         const cw = stage.clientWidth, chh = stage.clientHeight;
         const curL = parseFloat(api.cell.style.left) || 0;
         const curT = parseFloat(api.cell.style.top) || 0;
-        const sL = parseFloat(api.cell.dataset.slotL) / 100 * cw;
-        const sT = parseFloat(api.cell.dataset.slotT) / 100 * chh;
-        const sW = parseFloat(api.cell.dataset.slotW) / 100 * cw;
-        const sH = parseFloat(api.cell.dataset.slotH) / 100 * chh;
-        const near = Math.hypot(curL - sL, curT - sT) < SNAP_RETURN;
-        const over = curL < sL + sW && curL + r.width > sL && curT < sT + sH;
-        if (near || over) {
+        const slotPxL = parseFloat(api.cell.dataset.slotL) / 100 * cw;
+        const slotPxT = parseFloat(api.cell.dataset.slotT) / 100 * chh;
+        const slotW = parseFloat(api.cell.dataset.slotW) / 100 * cw;
+        const slotH = parseFloat(api.cell.dataset.slotH) / 100 * chh;
+        if (Math.hypot(curL - slotPxL, curT - slotPxT) < SNAP_RETURN ||
+            (curL < slotPxL + slotW && curL + r.width > slotPxL && curT < slotPxT + slotH)) {
           Object.assign(api.cell.style, {
-            left: api.cell.dataset.slotL + '%', top: api.cell.dataset.slotT + '%',
-            width: api.cell.dataset.slotW + '%', height: api.cell.dataset.slotH + '%',
+            left: api.cell.dataset.slotL + '%',
+            top: api.cell.dataset.slotT + '%',
+            width: api.cell.dataset.slotW + '%',
+            height: api.cell.dataset.slotH + '%',
           });
           api.cell.classList.add('snapped');
           api.cell.classList.remove('free');
@@ -349,7 +384,42 @@ function bar_drag(api, bar, stage) {
   });
 }
 
-/* ================= grouping / branding ================= */
+/* ================= layout ================= */
+function autoGrid(n) {
+  if (n <= 1) return [1, 1];
+  if (n === 2) return [2, 1];
+  if (n <= 4) return [2, 2];
+  if (n <= 6) return [3, 2];
+  if (n <= 8) return [4, 2];
+  return [4, Math.ceil(n / 4)];
+}
+
+function applyLayout(stage, wins, mode, fit) {
+  const eff = mode === 'auto' ? autoGrid(wins.length).join('x') : mode;
+  stage.classList.toggle('solo', eff === '1x1' && wins.length <= 1);
+
+  if (mode !== 'free') {
+    const [cols, rows] = eff.split('x').map(Number);
+    const gap = mode === 'auto' ? 0.6 : 0.9;
+    const cw = (100 - gap * (cols + 1)) / cols;
+    const ch = (100 - gap * (rows + 1)) / rows;
+    wins.forEach((w, i) => {
+      if (i >= cols * rows) { w.cell.style.opacity = '.25'; delete w.cell.dataset.slotL; return; }
+      w.cell.style.opacity = '';
+      const L = gap + (i % cols) * (cw + gap);
+      const T = gap + Math.floor(i / cols) * (ch + gap);
+      Object.assign(w.cell.style, {
+        left: L + '%', top: T + '%', width: cw + '%', height: ch + '%',
+      });
+      w.cell.dataset.slotL = L; w.cell.dataset.slotT = T;
+      w.cell.dataset.slotW = cw; w.cell.dataset.slotH = ch;
+      w.cell.classList.add('snapped');
+    });
+  }
+  fit(stage, wins, mode, eff);
+}
+
+/* grouping/tree helpers unchanged in spirit ------------------------- */
 const QUALIFIERS = new Set(['PLUS', 'EXTRA', 'HD', 'FHD', 'SD', 'UHD', '4K', '8K', 'EAST', 'WEST', 'NORTH', 'SOUTH', 'FEED']);
 const NUMBERY = /^\+?\d+(\.\d+)?$/;
 function brandOf(c) {
@@ -365,6 +435,78 @@ function brandOf(c) {
   return c.brand;
 }
 
+function channelButton(ch, favs, onToggleFav, onPlay, onPlayNew) {
+  const st = getStatus(ch.id);
+  const stream = hasStream(ch.id);
+  const b = el('button', 'tree-channel' + (stream ? '' : ' nostream'));
+  const logo = logoFor(ch.id);
+  const flag = !logo ? flagFor(ch.country) : '';
+  b.innerHTML = `
+    <span class="dot ${st}${stream ? '' : ' none'}"></span>
+    ${logo ? `<img class="ch-logo" loading="lazy" src="${esc(logo)}" onerror="this.replaceWith(document.createTextNode(''))" alt="">`
+           : flag ? `<img class="ch-flag" loading="lazy" src="${flag}" onerror="this.style.display='none'" alt="">` : ''}
+    <span class="tree-ch-name">${esc(ch.name)}</span>
+    <span class="ch-actions">
+      <button class="row-new" title="Open in NEW player" aria-label="Open in new player">＋</button>
+      <button class="fav-star${favs.has(ch.id) ? ' on' : ''}" title="${favs.has(ch.id) ? 'Unfavorite' : 'Favorite'}">★</button>
+    </span>`;
+  b.title = ch.name + (stream ? '' : ' · no stream');
+  b.addEventListener('click', e => {
+    if (e.target.closest('.fav-star') || e.target.closest('.row-new')) return;
+    if (!stream) { toast(`NO STREAM FOR ${ch.name.toUpperCase().slice(0, 26)}`); return; }
+    onPlay(ch);
+  });
+  b.querySelector('.row-new').addEventListener('click', e => {
+    e.stopPropagation();
+    if (!stream) { toast(`NO STREAM FOR ${ch.name.toUpperCase().slice(0, 26)}`); return; }
+    onPlayNew(ch);
+  });
+  b.querySelector('.fav-star').addEventListener('click', e => { e.stopPropagation(); onToggleFav(ch.id); });
+  return b;
+}
+
+function renderTree(container, opts, favs, onToggleFav, onPlayNew) {
+  const openKeys = new Set([...container.querySelectorAll('details[open]')].map(d => d.dataset.k));
+  container.replaceChildren();
+
+  if (favs.size) {
+    const fc = opts.all.filter(c => favs.has(c.id)).sort((a, b) => a.name.localeCompare(b.name));
+    const det = el('details', 'tree-letter fav-group');
+    det.dataset.k = '★FAV';
+    if (openKeys.has('★FAV')) det.open = true;
+    det.appendChild(el('summary', null,
+      `<span class="tree-letter-mark">★</span><span class="tree-group-name">FAVORITES</span><span class="count">${fc.length}</span>`));
+    for (const ch of fc) det.appendChild(channelButton(ch, favs, onToggleFav, opts.onPlay, onPlayNew));
+    container.appendChild(det);
+  }
+
+  const grouped = groupChannels(opts.list, opts.sort);
+  for (const [g, subs] of grouped) {
+    let count = 0; for (const l of subs.values()) count += l.length;
+    const det = el('details', `tree-letter g-${opts.sort}`);
+    det.dataset.k = 'G:' + g;
+    if (openKeys.has(det.dataset.k)) det.open = true;
+    det.appendChild(el('summary', null,
+      `<span class="tree-letter-mark">${esc(g)}</span><span class="count">${count.toLocaleString()}</span>`));
+    for (const [sub, chans] of [...subs.entries()].sort((a, b) => (b.length - a.length) || a[0].localeCompare(b[0]))) {
+      const bd = el('details', 'tree-brand');
+      bd.dataset.k = `G:${g}|${sub}`;
+      if (openKeys.has(bd.dataset.k)) bd.open = true;
+      bd.appendChild(el('summary', null,
+        `<span class="tree-brand-name">${esc(sub)}</span><span class="count">${chans.length.toLocaleString()}</span>`));
+      for (const ch of chans.slice(0, BRAND_CAP))
+        bd.appendChild(channelButton(ch, favs, onToggleFav, opts.onPlay, onPlayNew));
+      if (chans.length > BRAND_CAP)
+        bd.appendChild(el('div', 'tree-more', `+${(chans.length - BRAND_CAP).toLocaleString()} more…`));
+      det.appendChild(bd);
+    }
+    container.appendChild(det);
+  }
+  if (!container.children.length)
+    container.appendChild(el('div', 'tree-empty',
+      opts.workingOnly ? 'No verified-working matches. Untick WORKING to widen the net.' : 'Nothing matches.'));
+}
+
 /* ================= bootstrap ================= */
 export function mountPrism({
   target,
@@ -373,111 +515,109 @@ export function mountPrism({
 } = {}) {
   document.title = title;
 
-  /* ---------- DOM ---------- */
-  const toolbar = el('div', 'stage-toolbar');
-  toolbar.innerHTML = `
-    <button class="strip-btn primary" id="addWin"><i class="fas fa-plus"></i> PLAYER</button>
-    <select class="strip-btn" id="layoutSel">
-      <option value="free" selected>FREE PLACE</option>
-      <option value="2x2">2×2</option><option value="3x2">3×2</option>
-      <option value="2x3">2×3</option><option value="4x2">4×2</option>
-      <option value="2x4">2×4</option><option value="1x1">1×1</option>
-    </select>
-    <span class="win-count" id="winCount">0</span>`;
+  /* ---------- DOM FIRST (bindings strictly after) ---------- */
+
+  /* stage */
   const stage = el('div', 'stage-area');
   const emptyState = el('div', 'stage-empty',
-    `<button class="stage-add">${chip('big')}<span>+ PLAYER</span></button>`);
+    `<button class="stage-add"><span class="alpha-spin big">α</span><span>+ PLAYER</span></button>`);
   stage.appendChild(emptyState);
 
   const main = el('div', 'app');
-  main.append(toolbar, stage);
+  main.appendChild(stage);
 
+  /* bottom dock */
   const dock = el('div', 'dock');
   const dockBar = el('div', 'dock-bar');
   dockBar.innerHTML = `
     <span class="dock-brand"><span class="alpha-mark">α</span><span class="wordmark">PRISM</span></span>
+    <select class="dock-tool" id="layoutSel" title="Grid snap">
+      <option value="auto" selected>AUTO</option>
+      <option value="free">FREE</option>
+      <option value="2x2">2×2</option>
+      <option value="3x2">3×2</option><option value="2x3">2×3</option>
+      <option value="4x2">4×2</option><option value="2x4">2×4</option>
+      <option value="1x1">1×1</option>
+    </select>
+    <button class="dock-tab active" data-pane="channels"><i class="fas fa-tv"></i> <span class="lbl">CHANNELS</span></button>
+    <button class="dock-tab" data-pane="guide"><i class="fas fa-list-ul"></i> <span class="lbl">GUIDE</span></button>
     <span class="dock-meta" id="dockMeta">${chip('sm')} LOADING…</span>
     <span class="dock-tools">
       <button class="dock-tool primary" id="addWin" title="New player"><i class="fas fa-plus"></i></button>
-      <button class="dock-tool danger" id="closeAll" title="Close all"><i class="fas fa-xmark"></i></button>
+      <button class="dock-tool" id="srcBtn" title="Saved sources"><i class="fas fa-plug"></i></button>
+      <button class="dock-tool danger" id="closeAll" title="Close all players"><i class="fas fa-xmark"></i></button>
     </span>
-    <button class="dock-menu-btn" id="menuToggle">
-      <i class="fas fa-list-ul"></i> GUIDE <i class="fas fa-chevron-up" id="dockCaret"></i>
-    </button>`;
+    <i class="fas fa-chevron-up dock-caret" id="dockCaret"></i>`;
   const sheet = el('div', 'dock-sheet');
 
-  const filters = el('div', 'tree-filters');
-  filters.innerHTML = `
+  const chanPane = el('div', 'pane pane-channels');
+  const cFilters = el('div', 'tree-filters');
+  cFilters.innerHTML = `
     <input id="treeQ" class="url-input tree-q" type="search" placeholder="⌕ search channels…" />
-    <select id="sortSel" class="strip-btn tree-sort">
-      <option value="az" selected>A–Z</option>
-      <option value="category">CATEGORY</option>
-      <option value="country">COUNTRY</option>
+    <select id="sortSel" class="strip-btn tree-sort" title="Sort">
+      <option value="az" selected>A–Z</option><option value="category">CATEGORY</option><option value="country">COUNTRY</option>
     </select>
+    <select id="treeC" class="strip-btn tree-country" title="Country"><option value="all">🌍 ALL</option></select>
     <label class="tree-working"><input type="checkbox" id="treeW" checked /> WORKING</label>`;
-  const catRows = el('div', 'cat-rows', '<div class="tree-boot">…</div>');
-  const treeBox = el('div', 'tree-box');
-  sheet.append(filters, catRows, treeBox);
+  const treeBox = el('div', 'tree-box', `<div class="tree-boot">${chip('big')}<div>LOADING…</div></div>`);
+  chanPane.append(cFilters, treeBox);
+
+  const guidePane = el('div', 'pane pane-guide');
+  guidePane.innerHTML = `
+    <div class="guide-head">
+      <span class="guide-title">📺 TV GUIDE</span>
+      <span class="guide-sizes">
+        <button data-gsize="mini" title="Minimize">▁</button>
+        <button data-gsize="compact" class="on" title="Compact">▤</button>
+        <button data-gsize="full" title="Full page">⛶</button>
+      </span>
+    </div>
+    <div class="guide-body"><div class="tree-boot">${chip('big')}<div>LOADING…</div></div></div>`;
+
+  sheet.append(chanPane, guidePane);
   dock.append(dockBar, sheet);
   main.append(dock);
   target.appendChild(main);
 
-  /* ---------- state ---------- */
+  /* ---------- refs / state ---------- */
   const $ = id => document.getElementById(id);
-  const winCountEl = $('winCount');
-  const wins = [];
-  let layoutMode = 'free';
-  let drawerOpen = false;
-  const favs = getFavs();
+  const winCountEl = el('span', 'win-count', '0');
+  dockBar.insertBefore(winCountEl, dockBar.querySelector('.dock-tools'));
+  const guideBody = guidePane.querySelector('.guide-body');
+  const guideHeadBtns = guidePane.querySelectorAll('.guide-sizes button');
+  const caret = $('dockCaret');
 
-  /* ---------- layout ---------- */
-  function apply(mode) {
-    if (mode !== 'free') {
-      const [cols, rows] = mode.split('x').map(Number);
-      const gap = 0.9;
-      const cw = (100 - gap * (cols + 1)) / cols;
-      const ch = (100 - gap * (rows + 1)) / rows;
-      wins.forEach((w, i) => {
-        if (i >= cols * rows) { w.cell.style.opacity = '.25'; return; }
-        w.cell.style.opacity = '';
-        const L = gap + (i % cols) * (cw + gap);
-        const T = gap + Math.floor(i / cols) * (ch + gap);
-        Object.assign(w.cell.style, { left: L + '%', top: T + '%', width: cw + '%', height: ch + '%' });
-        w.cell.dataset.slotL = L; w.cell.dataset.slotT = T;
-        w.cell.dataset.slotW = cw; w.cell.dataset.slotH = ch;
-        w.cell.classList.add('snapped');
-      });
-    }
-    /* stage height adapts */
+  const wins = [];
+  let layoutMode = 'auto';
+  let activePane = null;
+  let guideSize = 'compact';
+  let guideBuilt = false;
+
+  function fit(stageArg, winsArg, mode, effMode) {
     let h;
     if (mode === 'free') {
-      const sTop = stage.getBoundingClientRect().top;
-      h = innerHeight - sTop - 62;                       // dock height
-      for (const w of wins) {
+      const sTop = stageArg.getBoundingClientRect().top;
+      h = innerHeight - sTop - sheetReserve() - 16;
+      for (const w of winsArg) {
         const r = w.cell.getBoundingClientRect();
         h = Math.max(h, r.bottom - sTop + 16);
       }
+    } else if (effMode === '1x1' && winsArg.length <= 1) {
+      h = innerHeight - stageArg.getBoundingClientRect().top - sheetReserve() - 8;
     } else {
-      const [cols, rowsCap] = mode.split('x').map(Number);
-      const laid = Math.min(Math.max(1, Math.ceil(wins.length / cols)), rowsCap) || 1;
-      const cw = (stage.clientWidth - 12 * (cols + 1)) / cols;
-      h = laid * (cw * 9 / 16 + 42) + 12 * (laid + 1);
+      const [cols, rowsCap] = effMode.split('x').map(Number);
+      const laidRows = Math.min(Math.max(1, Math.ceil(winsArg.length / cols)), rowsCap) || 1;
+      const cw = (stageArg.clientWidth - 12 * (cols + 1)) / cols;
+      h = laidRows * (cw * 9 / 16 + 42) + 12 * (laidRows + 1);
     }
-    stage.style.height = `${Math.round(Math.max(h, innerHeight * 0.45))}px`;
-
-    /* solo FREE = near-fullscreen window */
-    if (mode === 'free' && wins.length === 1) {
-      const w0 = wins[0];
-      w0.cell.classList.add('solo-win');
-      Object.assign(w0.cell.style, {
-        left: '8px', top: '8px',
-        width: (stage.clientWidth - 16) + 'px',
-        height: (parseFloat(stage.style.height) - 16) + 'px',
-      });
-    } else {
-      wins.forEach(w => w.cell.classList.remove('solo-win'));
-    }
+    stageArg.style.height = `${Math.round(Math.max(h, 240))}px`;
   }
+  function sheetReserve() {
+    return (activePane === 'guide' && guideSize === 'compact')
+      ? Math.round(innerHeight * 0.30) : 0;
+  }
+
+  function apply(mode) { applyLayout(stage, wins, mode, fit); }
 
   function refreshChrome() {
     emptyState.style.display = wins.length ? 'none' : '';
@@ -489,7 +629,7 @@ export function mountPrism({
     const w = createWindow({ stage });
     const origLoad = w.load.bind(w);
     w.load = (src, opts = {}) => {
-      if (!opts.isFile && typeof src === 'string') setLast(rawOf(src), name || '');
+      if (!opts.isFile && typeof src === 'string') setLast(src, name || '');
       return origLoad(src, opts);
     };
     w.onDestroy = api => {
@@ -508,9 +648,10 @@ export function mountPrism({
   $('closeAll').addEventListener('click', () => { while (wins.length) wins[0].close(); });
   $('layoutSel').addEventListener('change', e => {
     layoutMode = e.target.value;
-    if (layoutMode !== 'free') {
+    /* materialize container players up to the chosen slot count */
+    if (layoutMode !== 'free' && layoutMode !== 'auto') {
       const [c, r] = layoutMode.split('x').map(Number);
-      while (wins.length < c * r) addPlayer();       // materialize containers
+      while (wins.length < c * r) addPlayer();
     }
     apply(layoutMode);
   });
@@ -519,15 +660,16 @@ export function mountPrism({
   const focused = () => wins.reduce((a, b) =>
     (+a.cell.style.zIndex || 0) >= (+b.cell.style.zIndex || 0) ? a : b, wins.find(w => !w.isEmpty) || wins[0]);
 
+  /* play helpers: tap = replace focused (or fill an idle one); ＋ = new window */
   function playIntoTarget(ch) {
     const url = pickStream(ch.id);
     if (!url) return;
     let w = focused();
     if (!w) w = addPlayer();
-    if (w.isEmpty) w.fill(url, ch.name);
-    else { w.load(url); w.setTitle(ch.name.slice(0, 30)); }
-    setLast(rawOf(url), ch.name);
-    setDrawer(false);
+    if (w.isEmpty && w.fill) w.fill(url, ch.name);
+    else w.load(url), w.setTitle(ch.name.slice(0, 30));
+    setLast(url, ch.name);
+    if (matchMedia('(max-width:820px)').matches) setDock(null);
   }
   function playNewWindow(ch) {
     const url = pickStream(ch.id);
@@ -535,42 +677,62 @@ export function mountPrism({
     const w = addPlayer();
     w.load(url);
     w.setTitle(ch.name.slice(0, 30));
-    setLast(rawOf(url), ch.name);
+    setLast(url, ch.name);
   }
 
   /* ---------- favorites ---------- */
+  const favs = getFavs();
   function toggleFav(id) {
     favs.has(id) ? favs.delete(id) : favs.add(id);
     saveFavs(favs);
-    rerenderContent();
+    rerenderTree();
     updateMeta();
   }
 
-  /* ---------- drawer ---------- */
-  const sheetBodyMax = () =>
-    getPresets; // noop keep minifier happy
-  function setDrawer(open) {
-    drawerOpen = open;
-    dock.classList.toggle('open', open);
-    $('dockCaret').className = `fas fa-chevron-${open ? 'down' : 'up'}`;
-    if (open) updateMeta();
+  /* ---------- dock panes ---------- */
+  function setDock(name) {
+    activePane = name;
+    const opening = !!name;
+    dock.classList.toggle('open', opening);
+    document.body.classList.toggle('guide-reserve',
+      name === 'guide' && guideSize === 'compact');
+    if (name !== 'guide') dock.classList.remove('guide-mini', 'guide-full');
+
+    chanPane.style.display = name === 'channels' ? '' : 'none';
+    guidePane.style.display = name === 'guide' ? '' : 'none';
+    dockBar.querySelectorAll('.dock-tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.pane === name));
+    caret.className = `fas fa-chevron-${opening ? 'down' : 'up'} dock-caret`;
+
+    if (name === 'guide') {
+      dock.classList.toggle('guide-full', guideSize === 'full');
+      dock.classList.toggle('guide-mini', guideSize === 'mini');
+      if (!guideBuilt) buildGuide();
+    }
+    apply(layoutMode);
   }
-  $('menuToggle').addEventListener('click', e => { e.stopPropagation(); setDrawer(!drawerOpen); });
+  dockBar.querySelectorAll('.dock-tab').forEach(t =>
+    t.addEventListener('click', e => {
+      e.stopPropagation();
+      setDock(activePane === t.dataset.pane ? null : t.dataset.pane);
+    }));
 
-  /* auto-hide footer */
-  let hideTimer = null;
-  function poke() {
-    dock.classList.remove('autohidden');
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => { if (!drawerOpen) dock.classList.add('autohidden'); }, 4000);
+  function setGuideSize(s) {
+    guideSize = s;
+    dock.classList.remove('guide-mini', 'guide-full');
+    if (s !== 'compact') dock.classList.add(`guide-${s}`);
+    guideHeadBtns.forEach(b => b.classList.toggle('on', b.dataset.gsize === s));
+    document.body.classList.toggle('guide-reserve',
+      activePane === 'guide' && s === 'compact');
+    if (s === 'mini') setDock(null);
+    else setDock('guide');
   }
-  ['pointermove', 'pointerdown', 'touchstart', 'keydown'].forEach(evt =>
-    document.addEventListener(evt, poke, { passive: true }));
-  poke();
+  guideHeadBtns.forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    setGuideSize(b.dataset.gsize);
+  }));
 
-  /* ---------- content: category rows vs bracket tree ---------- */
-  const treeOpts = { q: '', country: 'all', workingOnly: true, sort: 'az', all: [], list: [] };
-
+  /* ---------- guide cards ---------- */
   function gcard(ch) {
     const st = getStatus(ch.id);
     const stream = hasStream(ch.id);
@@ -582,32 +744,23 @@ export function mountPrism({
         : esc((ch.name || '?')[0].toUpperCase())}</span>
       <span class="gcard-name">${esc(ch.name)}</span>
       <span class="dot ${st}${stream ? '' : ' none'}"></span>`;
-    card.title = ch.name + ' · tap = replace current · long-coming: new window';
+    card.title = ch.name + ' · tap to replace current player';
     card.addEventListener('click', () => {
       if (!stream) { toast(`NO STREAM FOR ${ch.name.toUpperCase().slice(0, 24)}`); return; }
       playIntoTarget(ch);
+      if (matchMedia('(max-width:820px)').matches) setGuideSize('mini');
     });
     return card;
   }
 
-  function renderCategoryRows(container) {
-    container.replaceChildren();
+  function buildGuide() {
+    guideBuilt = true;
+    guideBody.replaceChildren();
     const cats = categories().filter(([c]) => !['xxx', 'adult'].includes(c.toLowerCase()));
     const prio = [...cats].sort((a, b) => {
       const ia = GUIDE_ROW_ORDER.indexOf(a[0]), ib = GUIDE_ROW_ORDER.indexOf(b[0]);
       return ((ia >= 0 ? ia : 99) - (ib >= 0 ? ib : 99)) || (b[1] - a[1]);
-    });
-    if (favs.size) {
-      const row = el('div', 'guide-row');
-      row.appendChild(el('div', 'guide-row-title',
-        `<span style="color:var(--accent-secondary)">★ FAVORITES</span> <span class="count">${favs.size}</span>`));
-      const strip = el('div', 'guide-cards');
-      [...favs].map(id => treeOpts.byIdGet(id)).filter(Boolean)
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .forEach(c => strip.appendChild(gcard(c)));
-      row.appendChild(strip);
-      container.appendChild(row);
-    }
+    }).slice(0, 14);
     for (const [cat] of prio) {
       const chans = query({ q: '', country: 'all', workingOnly: true })
         .filter(c => (c.categories || []).map(x => x.toLowerCase()).includes(cat))
@@ -619,97 +772,28 @@ export function mountPrism({
       const strip = el('div', 'guide-cards');
       chans.forEach(c => strip.appendChild(gcard(c)));
       row.appendChild(strip);
-      container.appendChild(row);
+      guideBody.appendChild(row);
     }
-    if (!container.children.length)
-      container.innerHTML = '<div class="tree-empty">No categorized channels yet.</div>';
+    if (!guideBody.children.length)
+      guideBody.innerHTML = '<div class="tree-empty">No categorized channels yet.</div>';
   }
 
-  function channelButton(ch, onPlay, onPlayNew) {
-    const st = getStatus(ch.id);
-    const stream = hasStream(ch.id);
-    const b = el('button', 'tree-channel' + (stream ? '' : ' nostream'));
-    const logo = logoFor(ch.id);
-    const flag = !logo ? flagFor(ch.country) : '';
-    b.innerHTML = `
-      <span class="dot ${st}${stream ? '' : ' none'}"></span>
-      ${logo ? `<img class="ch-logo" loading="lazy" src="${esc(logo)}" onerror="this.replaceWith(document.createTextNode(''))" alt="">`
-             : flag ? `<img class="ch-flag" loading="lazy" src="${flag}" onerror="this.style.display='none'" alt="">` : ''}
-      <span class="tree-ch-name">${esc(ch.name)}</span>
-      <span class="ch-actions">
-        <button class="row-new" title="Open in NEW player">＋</button>
-        <button class="fav-star${favs.has(ch.id) ? ' on' : ''}" title="Favorite">★</button>
-      </span>`;
-    b.title = ch.name + (stream ? '' : ' · no stream');
-    b.addEventListener('click', e => {
-      if (e.target.closest('.fav-star') || e.target.closest('.row-new')) return;
-      if (!stream) { toast(`NO STREAM FOR ${ch.name.toUpperCase().slice(0, 26)}`); return; }
-      onPlay(ch);
-    });
-    b.querySelector('.row-new').addEventListener('click', e => { e.stopPropagation(); onPlayNew(ch); });
-    b.querySelector('.fav-star').addEventListener('click', e => { e.stopPropagation(); toggleFav(ch.id); });
-    return b;
-  }
-
-  function renderTree(container, list, onPlay, onPlayNew) {
-    const openKeys = new Set([...container.querySelectorAll('details[open]')].map(d => d.dataset.k));
-    container.replaceChildren();
-    if (favs.size) {
-      const fc = [...favs].map(id => treeOpts.byIdGet(id)).filter(Boolean)
-        .sort((a, b) => a.name.localeCompare(b.name));
-      const det = el('details', 'tree-letter fav-group');
-      det.dataset.k = '★FAV';
-      if (openKeys.has('★FAV')) det.open = true;
-      det.appendChild(el('summary', null,
-        `<span class="tree-letter-mark">★</span><span class="tree-group-name">FAVORITES</span><span class="count">${fc.length}</span>`));
-      for (const ch of fc) det.appendChild(channelButton(ch, onPlay, onPlayNew));
-      container.appendChild(det);
-    }
-    const grouped = groupChannels(list, treeOpts.sort);
-    for (const [g, subs] of grouped) {
-      let count = 0; for (const l of subs.values()) count += l.length;
-      const det = el('details', 'tree-letter');
-      det.dataset.k = 'G:' + g;
-      if (openKeys.has(det.dataset.k)) det.open = true;
-      det.appendChild(el('summary', null,
-        `<span class="tree-letter-mark">${esc(g)}</span><span class="count">${count.toLocaleString()}</span>`));
-      for (const [sub, chans] of [...subs.entries()].sort((a, b) => (b.length - a.length) || a[0].localeCompare(b[0]))) {
-        const bd = el('details', 'tree-brand');
-        bd.dataset.k = `G:${g}|${sub}`;
-        if (openKeys.has(bd.dataset.k)) bd.open = true;
-        bd.appendChild(el('summary', null,
-          `<span class="tree-brand-name">${esc(sub)}</span><span class="count">${chans.length.toLocaleString()}</span>`));
-        for (const ch of chans.slice(0, BRAND_CAP))
-          bd.appendChild(channelButton(ch, onPlay, onPlayNew));
-        if (chans.length > BRAND_CAP)
-          bd.appendChild(el('div', 'tree-more', `+${(chans.length - BRAND_CAP).toLocaleString()} more…`));
-        det.appendChild(bd);
-      }
-      container.appendChild(det);
-    }
-    if (!container.children.length)
-      container.appendChild(el('div', 'tree-empty',
-        treeOpts.workingOnly ? 'No verified-working matches. Untick WORKING.' : 'Nothing matches.'));
-  }
-
-  function rerenderContent() {
-    if (treeOpts.sort === 'category') {
-      treeBox.style.display = 'none';
-      catRows.style.display = '';
-      renderCategoryRows(catRows);
-    } else {
-      catRows.style.display = 'none';
-      treeBox.style.display = '';
-      renderTree(treeBox, query(treeOpts), playIntoTarget, playNewWindow);
-    }
+  /* ---------- channels tree ---------- */
+  const treeOpts = { q: '', country: 'all', workingOnly: true, sort: 'az', all: [], list: [] };
+  function rerenderTree() {
+    treeOpts.list = query(treeOpts);
+    renderTree(treeBox, treeOpts, favs, toggleFav, playNewWindow);
   }
   let qT;
-  filters.querySelector('#treeQ').addEventListener('input', e => {
+  cFilters.querySelector('#treeQ').addEventListener('input', e => {
     clearTimeout(qT);
-    qT = setTimeout(() => { treeOpts.q = e.target.value; rerenderContent(); }, 250);
+    qT = setTimeout(() => { treeOpts.q = e.target.value; rerenderTree(); }, 250);
   });
-  filters.querySelector('#treeW').addEventListener('change', e => { treeOpts.workingOnly = e.target.checked; rerenderContent(); });
-  filters.querySelector('#sortSel').addEventListener('change', e => { treeOpts.sort = e.target.value; rerenderContent(); });
+  cFilters.querySelector('#treeW').addEventListener('change', e => { treeOpts.workingOnly = e.target.checked; rerenderTree(); });
+  cFilters.querySelector('#treeC').addEventListener('change', e => { treeOpts.country = e.target.value; rerenderTree(); });
+  cFilters.querySelector('#sortSel').addEventListener('change', e => { treeOpts.sort = e.target.value; rerenderTree(); });
+
+  createPresetMenu(focused, $('srcBtn'));
 
   function updateMeta() {
     const s = stats();
@@ -718,31 +802,48 @@ export function mountPrism({
       (favs.size ? ` · <b style="color:var(--accent-secondary)">★${favs.size}</b>` : '');
   }
 
-  /* expose channel lookup for favorites rendering */
-  treeOpts.byIdGet = id => query({ q: '', country: 'all', workingOnly: false }).find(c => c.id === id);
-
-  /* ---------- boot ---------- */
+  /* ---------- boot: last-stream memory ---------- */
   (async () => {
     try {
       const s = await loadCatalog(m => {
-        catRows.innerHTML = `<div class="tree-boot">${chip('big')}<div>${esc(m || 'working…')}</div></div>`;
+        treeBox.innerHTML = `<div class="tree-boot">${chip('big')}<div>${esc(m || 'working…')}</div></div>`;
+        guideBody.innerHTML = `<div class="tree-boot">${chip('big')}<div>${esc(m || 'working…')}</div></div>`;
         $('dockMeta').innerHTML = `${chip('sm')} ${esc(m || 'loading…')}`;
       });
+      cFilters.querySelector('#treeC').insertAdjacentHTML('beforeend',
+        countries().slice(0, 60)
+          .map(([code, n]) => `<option value="${code}">${code.toUpperCase()} (${n.toLocaleString()})</option>`).join(''));
       treeOpts.all = query({ q: '', country: 'all', workingOnly: false });
-      rerenderContent();
+      rerenderTree();
       updateMeta();
-      requestLogos(rerenderContent);
-      toast(`${s.total.toLocaleString()} READY · ${s.working.toLocaleString()} VERIFIED`);
+      requestLogos(() => { rerenderTree(); if (guideBuilt) buildGuide(); });
     } catch (e) {
-      catRows.innerHTML = `<div class="tree-boot">⚠ catalog failed: ${esc(e.message)}</div>`;
+      treeBox.innerHTML = `<div class="tree-boot">⚠ catalog failed: ${esc(e.message)}</div>`;
       $('dockMeta').textContent = 'catalog offline — players still work';
     }
+
     const qp = new URLSearchParams(location.search).get('src');
     const last = getLast();
-    const boot = qp || (last ? rawOf(last.url) : null) || defaultSource;
-    const w = addPlayer(boot);
+    const boot = qp || last?.url || defaultSource;
+    const w = addPlayer(qp ? qp : proxied(boot));
     if (!qp && last?.name) w.setTitle(last.name.slice(0, 30));
+
+    setDock('guide');   // TV GUIDE loads expanded + compact
   })();
 
-  return { app: main, addPlayer, wins, rerenderContent, setDrawer, player() { return focused(); } };
+  return { app: main, addPlayer, wins, rerenderTree, setDock, setGuideSize, player() { return focused(); } };
+}
+
+
+/* ---------- poker-chip spinner + mute badge helpers (Piece 007a) ---------- */
+function showMuteBadge(cell) {
+  if (!cell || cell.querySelector('.mute-badge')) return;
+  const b = el('button', 'mute-badge', '🔇 TAP FOR SOUND');
+  b.addEventListener('click', e => {
+    e.stopPropagation();
+    const v = cell.querySelector('video');
+    if (v) { v.muted = false; v.volume = Math.max(v.volume, .8); }
+    b.remove();
+  });
+  cell.appendChild(b);
 }
