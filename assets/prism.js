@@ -41,7 +41,7 @@ function loadScript(src) {
 const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 /* spinning ALPHA loader (ABET live-odds motif) */
-const chip = (size = '') => `<span class="alpha-spin ${size}">α</span>`;
+const chip = (size = '') => `<span class="poker-chip ${size}"><i></i></span>`;
 const proxied = url => `${PROXY}?u=${encodeURIComponent(url)}`;
 
 function getLast() { try { return JSON.parse(localStorage.getItem(LAST_KEY)) || null; } catch { return null; } }
@@ -189,6 +189,29 @@ export function createPresetMenu(getWin, anchorBtn) {
 /* ================= player window ================= */
 let zTop = 500;
 
+/* group channels into Map<group, Map<brand, channel[]>> for any sort mode */
+function groupChannels(list, mode) {
+  const top = new Map();
+  const put = (g, c) => {
+    if (!top.has(g)) top.set(g, new Map());
+    const bk = brandOf(c), m = top.get(g);
+    if (!m.has(bk)) m.set(bk, []);
+    m.get(bk).push(c);
+  };
+  for (const c of list) {
+    if (mode === 'category') {
+      const cats = (c.categories || []).filter(Boolean);
+      for (const k of (cats.length ? cats.slice(0, 2) : ['general'])) put(k, c);
+    } else if (mode === 'country') {
+      put((c.country || '??').toUpperCase(), c);
+    } else {
+      const bk = brandOf(c);
+      put(/^[A-Z]/.test(bk[0]) ? bk[0] : '#', c);
+    }
+  }
+  return top;
+}
+
 export function createWindow({ stage, title = 'LIVE', idle = false }) {
   const cell = el('section', 'pwin');
   cell.innerHTML = `
@@ -213,7 +236,24 @@ export function createWindow({ stage, title = 'LIVE', idle = false }) {
   let engine = null, objectUrl = null, currentUrl = '', engineLabel = '—';
   let isEmpty = !!idle;
 
-  const fail = m => { errEl.textContent = m; errEl.classList.add('show'); loading.style.display = 'none'; toast(m); };
+  const fail = m => { errEl.textContent = m; errEl.classList.add('show'); toast(m); loading.style.display = 'none'; };
+
+  const isIdle = () => idleEl.style.display !== 'none';
+  video.addEventListener('waiting', () => { if (!isIdle()) loading.style.display = ''; });
+  video.addEventListener('playing', () => { loading.style.display = 'none'; });
+  video.addEventListener('canplay', () => { if (!isIdle()) loading.style.display = 'none'; });
+
+  /* autoplay policy: retry muted, offer one-tap sound */
+  function attemptPlay() {
+    const p = video.play();
+    if (!p) return;
+    p.catch(err => {
+      if (err && err.name === 'NotAllowedError') {
+        video.muted = true;
+        video.play().then(() => showMuteBadge(cell)).catch(() => {});
+      }
+    });
+  }
 
   function teardown() {
     if (engine?.destroy) try { engine.destroy(); } catch {}
@@ -257,7 +297,7 @@ export function createWindow({ stage, title = 'LIVE', idle = false }) {
         engine.initialize(video, target, true);
         engineLabel = 'dash.js';
       } else { video.src = target; engineLabel = 'native'; }
-      await video.play().catch(() => {});
+      attemptPlay();
     } catch (e) { fail(e.message || String(e)); }
   }
 
@@ -788,8 +828,22 @@ export function mountPrism({
     const w = addPlayer(qp ? qp : proxied(boot));
     if (!qp && last?.name) w.setTitle(last.name.slice(0, 30));
 
-    setPane('guide');   // TV GUIDE loads expanded + compact
+    setDock('guide');   // TV GUIDE loads expanded + compact
   })();
 
   return { app: main, addPlayer, wins, rerenderTree, setDock, setGuideSize, player() { return focused(); } };
+}
+
+
+/* ---------- poker-chip spinner + mute badge helpers (Piece 007a) ---------- */
+function showMuteBadge(cell) {
+  if (!cell || cell.querySelector('.mute-badge')) return;
+  const b = el('button', 'mute-badge', '🔇 TAP FOR SOUND');
+  b.addEventListener('click', e => {
+    e.stopPropagation();
+    const v = cell.querySelector('video');
+    if (v) { v.muted = false; v.volume = Math.max(v.volume, .8); }
+    b.remove();
+  });
+  cell.appendChild(b);
 }

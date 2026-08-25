@@ -495,3 +495,36 @@ option { background: #070B0F; color: var(--text-light); }
 
 /* drag intent feedback */
 .pwin.dragging { box-shadow: 0 18px 44px rgba(0,0,0,.65), 0 0 20px rgba(0,184,212,.35); border-color: var(--accent-primary); }
+
+
+/* ---------- Piece 007a: casino-chip spinner + mute badge ---------- */
+@keyframes chipSpin { to { transform: rotate(360deg); } }
+.poker-chip {
+  position: relative; display: inline-block;
+  width: 44px; height: 44px; border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #0d1320 0 34%, transparent 34%),
+    conic-gradient(#FFD600 0 30deg, #090D14 30deg 60deg, #FFD600 60deg 90deg, #090D14 90deg 120deg,
+                   #FFD600 120deg 150deg, #090D14 150deg 180deg, #FFD600 180deg 210deg, #090D14 210deg 240deg,
+                   #FFD600 240deg 270deg, #090D14 270deg 300deg, #FFD600 300deg 330deg, #090D14 330deg 360deg);
+  border: 3px solid #FFD600;
+  box-shadow: 0 0 16px rgba(255,214,0,.45), inset 0 0 10px rgba(0,0,0,.7);
+  animation: chipSpin 1.15s linear infinite;
+}
+.poker-chip i {
+  position: absolute; inset: 22%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #101725 55%, #00B8D4 56%, #090D14 78%);
+  box-shadow: inset 0 0 6px rgba(0,184,212,.6);
+}
+.poker-chip.big { width: 64px; height: 64px; border-width: 4px; }
+.poker-chip.sm { width: 20px; height: 20px; border-width: 2px; }
+.poker-chip.sm i { display: none; }
+
+.mute-badge {
+  position: absolute; top: 46px; left: 50%; transform: translateX(-50%);
+  z-index: 7; background: rgba(255,214,0,.92); color: #000;
+  border: none; border-radius: 999px; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 700;
+  padding: 8px 16px; letter-spacing: .5px;
+}
