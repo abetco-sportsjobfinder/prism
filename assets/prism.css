@@ -233,3 +233,52 @@ body {
 .player-error.show { display: block; }
 
 .footer-note { text-align: center; font-size: 10px; color: var(--text-muted); padding: 8px 0 16px; letter-spacing: 1px; text-transform: uppercase; }
+
+
+/* ---------- Piece 001 additions ---------- */
+
+/* SOURCE / preset popover menus (dropdown-menu DNA from ABET) */
+.popover {
+  position: fixed; z-index: 1200;
+  background: var(--bg-darker);
+  border: 1px solid var(--border-color);
+  border-radius: 8px; padding: 12px;
+  min-width: 340px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 12px rgba(0,184,212,0.15);
+}
+.popover .url-input { width: 100%; margin: 10px 0; }
+.popover-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.popover-hint { font-size: 10px; color: var(--text-muted); margin-top: 10px; letter-spacing: .3px; }
+
+/* presets */
+.preset-list { max-height: 220px; overflow-y: auto; margin-top: 8px; }
+.preset-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.preset-name {
+  flex: 1; text-align: left; background: none; border: none;
+  color: var(--text-light); font-family: inherit; font-size: 12px;
+  padding: 7px 9px; border-radius: 6px; cursor: pointer; transition: background .2s;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.preset-name:hover { background: rgba(0, 184, 212, 0.2); color: var(--accent-primary); }
+.preset-del { background: none; border: none; color: #ff6666; cursor: pointer; font-size: 12px; padding: 4px 8px; }
+.preset-del:hover { color: #ff4444; }
+.save-row { display: flex; gap: 8px; margin-top: 8px; }
+.preset-name-input { flex: 1; }
+
+/* multi-view grid */
+.mv-grid { display: grid; grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 10px; margin: 4px 15px 15px; }
+@media (max-width: 720px) { .mv-grid { grid-template-columns: 1fr; } }
+.tile { position: relative; border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 16/9; box-shadow: 0 0 14px rgba(0,184,212,0.12); }
+.tile video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+.tile-bar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 10px; background: rgba(7, 11, 15, 0.78);
+  font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--accent-primary); opacity: 0; transition: opacity .2s;
+}
+.tile:hover .tile-bar, .tile:focus-within .tile-bar { opacity: 1; }
+.tile-src { background: var(--menu-bg); border: 1px solid var(--border-color); color: var(--text-light); font-family: inherit; font-size: 10px; padding: 3px 9px; border-radius: 4px; cursor: pointer; letter-spacing: 1px; }
+.tile-src:hover { background: rgba(0,184,212,.35); color: var(--accent-secondary); }
+.tile-error { display: none; position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; background: rgba(255,68,68,.12); border-top: 1px solid rgba(255,68,68,.4); color: #ff8888; font-size: 11px; padding: 6px 10px; }
+.tile-error.show { display: block; }
