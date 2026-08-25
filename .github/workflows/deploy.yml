@@ -23,5 +23,10 @@ jobs:
       - name: Verify live
         run: |
           set -e
-          curl -sf https://prism-tv.pages.dev/assets/prism.js | grep -q "mountPrism"
-          echo "live markers OK"
+          for i in $(seq 1 12); do
+            if curl -sf https://prism-tv.pages.dev/assets/prism.js | grep -q "mountPrism"; then
+              echo "live markers OK (attempt $i)"; exit 0
+            fi
+            echo "attempt $i: not propagated yet"; sleep 10
+          done
+          echo "live markers never appeared"; exit 1
