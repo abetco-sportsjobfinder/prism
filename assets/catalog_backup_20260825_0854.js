@@ -18,7 +18,6 @@ export const db = {
   byId: new Map(),
   streamsByChannel: new Map(),
   status: new Map(),       // id -> {status,time}
-  totalIndexed: 0,         // every channel in iptv-org, incl. zero-stream ones
 };
 
 async function fetchT(url, tries = 2) {
@@ -94,7 +93,7 @@ export function countries() {
 export function stats() {
   let working = 0;
   for (const c of db.channels) if (getStatus(c.id) === 'working') working++;
-  return { total: db.channels.length, totalAll: db.totalIndexed, working };
+  return { total: db.channels.length, working };
 }
 
 /* query filters -> flat channel list */
@@ -139,7 +138,6 @@ export async function loadCatalog(onProgress = () => {}) {
   onProgress('parsing catalog…');
   const [channelsData, streamsData] = [await chRes.json(), await stRes.json()];
   onProgress(`indexing ${streamsData.length.toLocaleString()} streams…`);
-  db.totalIndexed = channelsData.length;
 
   const byId = new Map(channelsData.map(c => [c.id, {
     id: c.id, name: c.name, country: c.country || '',
@@ -154,12 +152,10 @@ export async function loadCatalog(onProgress = () => {}) {
   }
 
   onProgress('loading verified-working map…');
-  /* global probe results: cron shortlist + every device's reported statuses.
-     NOTE: the worker only echoes ACAO for allowlisted pages.dev origins —
-     if both maps come back empty, suspect CORS before suspecting data. */
+  /* global probe results: cron shortlist + every device's reported statuses */
   const jobs = [
-    fetch(`${PROXY}/shortlist`).then(r => r.ok ? r.json() : null).catch(e => { console.warn('[catalog] /shortlist blocked:', e.message); return null; }),
-    fetch(`${PROXY}/api/status`).then(r => r.ok ? r.json() : null).catch(e => { console.warn('[catalog] /api/status blocked:', e.message); return null; }),
+    fetch(`${PROXY}/shortlist`).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch(`${PROXY}/api/status`).then(r => r.ok ? r.json() : null).catch(() => null),
   ];
   const [shortlist, legacyStatus] = await Promise.all(jobs);
   if (shortlist?.channels) {
@@ -168,7 +164,6 @@ export async function loadCatalog(onProgress = () => {}) {
     }
   }
   mergeStatusMap(legacyStatus);
-  if (!db.status.size) console.warn('[catalog] ZERO statuses loaded — CORS allowlist or empty KV');
 
   onProgress('ranking…');
   const out = [];

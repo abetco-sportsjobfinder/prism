@@ -282,7 +282,7 @@ export function createWindow({ stage, title = 'PLAYER' }) {
 
   /* default size/cascade position */
   const n = stage.querySelectorAll('.pwin').length;
-  const w = Math.min(stage.clientWidth * 0.46, 620);
+  const w = Math.min(stage.clientWidth * (matchMedia('(max-width:820px)').matches ? 0.94 : 0.46), 620);
   Object.assign(cell.style, {
     width: w + 'px',
     height: (w * 9 / 16 + 34) + 'px',
@@ -472,11 +472,12 @@ export function mountPrism({
         .map(([code, n]) => `<option value="${code}">${code.toUpperCase()} (${n.toLocaleString()})</option>`).join('');
       filters.querySelector('#treeC').insertAdjacentHTML('beforeend', cc);
       rerenderTree();
-      nav.meta(`${s.total.toLocaleString()} CH · <b style="color:#00ff88">${s.working.toLocaleString()} WORKING</b>`);
+      nav.meta(`${s.total.toLocaleString()} READY · <b style="color:#00ff88">${s.working.toLocaleString()} VERIFIED</b>`);
       setTicker([
-        `${s.total.toLocaleString()} CHANNELS`,
+        `${s.totalAll.toLocaleString()} CHANNELS INDEXED`,
+        `${s.total.toLocaleString()} WITH STREAMS`,
         `${s.working.toLocaleString()} VERIFIED WORKING`,
-        'CLICK ANY CHANNEL TO PLAY',
+        'CLICK ANY GREEN CHANNEL TO PLAY',
         'HLS • DASH • MP4 • FILES',
         'α PRISM',
       ]);
