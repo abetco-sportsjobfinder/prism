@@ -127,32 +127,3 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .poker-chip { animation-duration: 3s; }
 }
-
-
-/* ---------- R2: country filter + minimize ---------- */
-select, option { color-scheme: dark; }
-option { background: #070B0F; color: var(--text-light); }
-
-.list-bar {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 14px; font-size: 11px; letter-spacing: 1px;
-  text-transform: uppercase; color: var(--text-muted);
-  position: sticky; top: 0; z-index: 20;
-  background: var(--bg-dark);
-  border-top: 1px solid rgba(0,184,212,.12);
-  border-bottom: 1px solid rgba(0,184,212,.12);
-}
-@media (min-width:1000px){ .list-bar{max-width:1200px;margin:0 auto;width:calc(100% - 0px);} }
-.country-select, .min-btn {
-  background: var(--bg-darker); border: 1px solid var(--border-color);
-  color: var(--text-light); font-family: inherit; font-size: 12px;
-  padding: 7px 10px; min-height: 38px; border-radius: 6px; cursor: pointer;
-  transition: border .2s;
-}
-.min-btn:hover, .country-select:hover { border-color: var(--accent-primary); }
-.country-select { max-width: 190px; }
-.ch-list.min { display: none; }
-@media (max-width: 640px) {
-  .list-bar { flex-wrap: wrap; }
-  .country-select, .min-btn { min-height: 42px; font-size: 13px; }
-}

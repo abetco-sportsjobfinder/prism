@@ -3,7 +3,7 @@
    No filters, no search, no sort, no multi-player, no chrome.
    ============================================================ */
 
-import { loadCatalog, db, countries, getStatus, hasStream, pickStream } from './catalog.js';
+import { loadCatalog, db, getStatus, hasStream, pickStream } from './catalog.js';
 
 const CDN = {
   hls: 'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js',
@@ -203,60 +203,28 @@ export function mountPrism({ target, title = 'prism' } = {}) {
   document.title = title;
 
   const stage = el('div', 'stage');
-
-  const bar = el('div', 'list-bar');
-  const listStatus = el('span', null, `${chipHTML} LOADING EVERY CHANNEL…`);
-  const cSel = el('select', 'country-select');
-  cSel.innerHTML = '<option value="all">🌍 ALL</option>';
-  const minBtn = el('button', 'min-btn', '▾ CHANNELS');
-  bar.append(listStatus, cSel, minBtn);
-
+  const listStatus = el('div', 'list-status', `${chipHTML} LOADING EVERY CHANNEL…`);
   const list = el('div', 'ch-list');
-  target.append(stage, bar, list);
+  target.append(stage, listStatus, list);
 
   const player = createPlayer({ stage });
 
   let ALL = [];
-  let CUR = [];                 // country-filtered view of ALL
   let rendered = 0;
-  let minimized = false;
   const sentinel = el('div', 'list-sentinel');
   const io = new IntersectionObserver(entries => {
     if (entries.some(e => e.isIntersecting)) appendChunk();
   }, { rootMargin: '900px' });
 
   function appendChunk() {
-    if (minimized || rendered >= CUR.length) return;
+    if (rendered >= ALL.length) return;
     const frag = document.createDocumentFragment();
-    const end = Math.min(rendered + CHUNK, CUR.length);
-    for (let i = rendered; i < end; i++) frag.appendChild(rowFor(CUR[i], ch => player.playChannel(ch)));
+    const end = Math.min(rendered + CHUNK, ALL.length);
+    for (let i = rendered; i < end; i++) frag.appendChild(rowFor(ALL[i], ch => player.playChannel(ch)));
     rendered = end;
     list.insertBefore(frag, sentinel);
-    listStatus.textContent = `${CUR.length.toLocaleString()} CHANNELS · showing ${rendered.toLocaleString()} · scroll for more`;
+    listStatus.textContent = `${ALL.length.toLocaleString()} CHANNELS · showing ${rendered.toLocaleString()} · scroll for more`;
   }
-
-  function applyCountry(cc) {
-    CUR = cc === 'all' ? ALL : ALL.filter(c => c.country === cc);
-    rendered = 0;
-    list.querySelectorAll('.ch-row').forEach(r => r.remove());
-    if (!minimized) appendChunk();
-    else listStatus.textContent = `${CUR.length.toLocaleString()} CHANNELS`;
-  }
-
-  /* minimize toggle */
-  minBtn.addEventListener('click', () => {
-    minimized = !minimized;
-    list.classList.toggle('min', minimized);
-    minBtn.textContent = (minimized ? '▸' : '▾') + ' CHANNELS';
-    if (minimized) {
-      io.disconnect();
-      listStatus.textContent = `${CUR.length.toLocaleString()} CHANNELS`;
-    } else {
-      io.observe(sentinel);
-      appendChunk();
-    }
-  });
-  cSel.addEventListener('change', () => applyCountry(cSel.value));
 
   (async () => {
     try {
@@ -264,10 +232,6 @@ export function mountPrism({ target, title = 'prism' } = {}) {
       ALL = [...db.channels].sort((a, b) =>
         ((hasStream(b.id) ? 0 : 1) - (hasStream(a.id) ? 0 : 1)) ||
         (a.rank - b.rank) || a.name.localeCompare(b.name));
-      CUR = ALL;
-      cSel.insertAdjacentHTML('beforeend',
-        countries().slice(0, 60)
-          .map(([code, n]) => `<option value="${code}">${code.toUpperCase()} (${n.toLocaleString()})</option>`).join(''));
       listStatus.textContent = '';
       list.appendChild(sentinel);
       io.observe(sentinel);
