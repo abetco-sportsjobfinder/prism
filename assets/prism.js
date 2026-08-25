@@ -55,6 +55,38 @@ function toast(msg) {
   toastEl._h = setTimeout(() => toastEl.classList.remove('show'), 2200);
 }
 
+/* ---------------- popovers ---------------- */
+let openPopover = null;
+function closeOpenPopover() { if (openPopover) { openPopover.remove(); openPopover = null; } }
+document.addEventListener('pointerdown', e => { if (openPopover && !openPopover.contains(e.target)) closeOpenPopover(); }, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOpenPopover(); });
+function showSmart(anchor, node) {
+  closeOpenPopover();
+  document.body.appendChild(node);
+  const vw = innerWidth, vh = innerHeight;
+  let w = Math.max(320, Math.round(anchor.getBoundingClientRect().width));
+  w = Math.min(w, vw - 20);
+  node.style.width = `${w}px`;
+  node.style.visibility = 'hidden'; node.style.display = 'block';
+  const nh = node.offsetHeight;
+  const r = anchor.getBoundingClientRect();
+  node.style.visibility = '';
+  let left, top;
+  if (matchMedia('(max-width:820px)').matches) {
+    left = (vw - w) / 2;
+    top = Math.max(12, (vh - nh) / 2 - 40);
+  } else {
+    left = Math.max(10, Math.min(r.left, vw - w - 10));
+    top = r.top - nh - 10;
+    if (top < 10) top = r.bottom + 10;
+    if (top + nh > vh - 10) top = Math.max(10, vh - nh - 10);
+  }
+  node.style.left = `${Math.round(left)}px`;
+  node.style.top = `${Math.round(top)}px`;
+  openPopover = node;
+  setTimeout(() => node.querySelector('input')?.focus(), 30);
+}
+
 /* logos */
 const logoMap = new Map();
 let logosRequested = false;
@@ -729,5 +761,42 @@ function bar_drag(api, bar, stage) {
       }
     };
     addEventListener('pointermove', move); addEventListener('pointerup', up);
+  });
+}
+
+
+/* SOURCE popover for one window (smart placement) */
+export function createSourceMenu(win, anchorBtn) {
+  const menu = el('div', 'popover');
+  menu.innerHTML = `
+    <div class="strip-title"><i class="fas fa-tv" style="color:var(--accent-primary)"></i>
+      OPEN A SOURCE <span class="strip-sep">|</span> <span class="engine-badge">${esc(win.engineLabel)}</span></div>
+    <input class="url-input" type="text" spellcheck="false" autocomplete="off"
+           placeholder="URL — .m3u8 / .mpd / .mp4 / webm / mkv…" />
+    <div class="popover-actions">
+      <button class="strip-btn" data-act="file">FILE…</button>
+      <button class="strip-btn primary" data-act="play">PLAY</button>
+    </div>
+    <input type="file" accept="video/*,audio/*,.mkv,.m3u8" style="display:none" />
+    <div class="menu-divider"></div>
+    <div class="popover-hint">Or pick a channel from the GUIDE drawer.</div>`;
+  const input = menu.querySelector('.url-input');
+  menu.querySelector('[data-act="play"]').addEventListener('click', () => {
+    const v = input.value.trim(); if (!v) return;
+    win.load(v); closeOpenPopover();
+  });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') menu.querySelector('[data-act="play"]').click(); });
+  const fi = menu.querySelector('input[type=file]');
+  menu.querySelector('[data-act="file"]').addEventListener('click', () => fi.click());
+  fi.addEventListener('change', () => {
+    const f = fi.files?.[0];
+    if (f) { win.load(f, { isFile: true }); closeOpenPopover(); }
+    fi.value = '';
+  });
+  anchorBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    menu.querySelector('.engine-badge').textContent = win.engineLabel || '—';
+    if (openPopover === menu) { closeOpenPopover(); return; }
+    showSmart(anchorBtn, menu);
   });
 }
