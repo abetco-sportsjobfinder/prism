@@ -487,8 +487,14 @@ export function mountPrism({
   }
 
   emptyState.querySelector('.stage-add').addEventListener('click', () => addPlayer());
-  /* NOTE: addWin / layoutSel / srcBtn / closeAll live inside the dock bar,
-     which is built further down — bindings happen right after it exists. */
+  document.getElementById('closeAll').addEventListener('click', () => {
+    while (wins.length) wins[0].close();
+  });
+  document.getElementById('addWin').addEventListener('click', () => addPlayer());
+  document.getElementById('layoutSel').addEventListener('change', e => {
+    layoutMode = e.target.value;
+    applyLayout(stage, wins, layoutMode);
+  });
   addEventListener('resize', () => applyLayout(stage, wins, layoutMode));
 
   const focused = () => wins.reduce((a, b) =>
@@ -563,16 +569,6 @@ export function mountPrism({
   filters.querySelector('#sortSel').addEventListener('change', e => { treeOpts.sort = e.target.value; rerenderTree(); });
 
   createPresetMenu(focused, document.getElementById('srcBtn'));
-
-  /* dock tool bindings (elements exist as of here) */
-  document.getElementById('addWin').addEventListener('click', () => addPlayer());
-  document.getElementById('closeAll').addEventListener('click', () => {
-    while (wins.length) wins[0].close();
-  });
-  document.getElementById('layoutSel').addEventListener('change', e => {
-    layoutMode = e.target.value;
-    applyLayout(stage, wins, layoutMode);
-  });
 
   function updateDockMeta() {
     const s = stats();
