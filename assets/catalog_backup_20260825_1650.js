@@ -69,11 +69,6 @@ export function getStatus(id) {
   return e.status === 'dead' ? 'dead' : 'working';
 }
 
-/* stream presence (zero-stream channels are playable-never) */
-export function hasStream(id) {
-  return db.streamsByChannel.has(id);
-}
-
 /* Best playable URL for a channel (ranked like the v1 player) */
 export function pickStream(id) {
   const all = db.streamsByChannel.get(id) || [];
@@ -97,21 +92,9 @@ export function countries() {
 }
 
 export function stats() {
-  let working = 0, ready = 0;
-  for (const c of db.channels) {
-    if (db.streamsByChannel.has(c.id)) ready++;
-    if (getStatus(c.id) === 'working') working++;
-  }
-  return { total: db.channels.length, totalAll: db.totalIndexed, ready, working };
-}
-
-/* distinct category list with counts */
-export function categories() {
-  const m = new Map();
-  for (const c of db.channels)
-    for (const cat of c.categories || [])
-      m.set(cat, (m.get(cat) || 0) + 1);
-  return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  let working = 0;
+  for (const c of db.channels) if (getStatus(c.id) === 'working') working++;
+  return { total: db.channels.length, totalAll: db.totalIndexed, working };
 }
 
 /* query filters -> flat channel list */
@@ -191,10 +174,8 @@ export async function loadCatalog(onProgress = () => {}) {
   const out = [];
   for (const c of byId.values()) {
     const streams = db.streamsByChannel.get(c.id);
-    // ALL indexed channels stay in the catalog now. Zero-stream ones get
-    // rank 3 (bottom); the WORKING / filters gate what grandma sees.
-    c.rank = !streams ? 3
-      : streams.some(s => GOOD_CDNS.some(g => s.url.includes(g))) ? 0 : 1;
+    if (!streams) continue;                       // square-one rule: no stream, no card
+    c.rank = streams.some(s => GOOD_CDNS.some(g => s.url.includes(g))) ? 0 : 1;
     db.byId.set(c.id, c);
     out.push(c);
   }

@@ -1,14 +1,18 @@
 /* ============================================================
-   PRISM — independent, embeddable AV module. Piece 004.
-   • Logos (lazy 2.8MB map → flag → initial fallback chain)
-   • ★ favorites, persisted per device
-   • Sort modes: A–Z brands / CATEGORY / COUNTRY
-   • ALL indexed channels present; WORKING toggle gates the noise
-   • No page-top chrome: single bottom dock holds brand, live
-     counts, +PLAYER, grid snap select, SOURCES, CLOSE ALL.
+   PRISM — independent, embeddable AV module. Piece 003.
+   • No header. α branding lives in the bottom dock.
+   • Bottom-dock CHANNELS drawer: collapsible, bracket tree
+     (letter > brand > channels), search/country/WORKING filters.
+   • Floating draggable players: ✕ per window, CLOSE ALL, + PLAYER.
+   • Stage height adapts to player count; snap grids:
+     free / 1x1 / 2x2 / 3x2 / 2x3 / 4x2 / 2x4.
+   Engines: .m3u8→hls.js(lazy)→native-HLS · .mpd→dash.js(lazy) ·
+            everything else native · local files via object URLs.
+
+   Embed: import { mountPrism } from '/assets/prism.js'
    ============================================================ */
 
-import { loadCatalog, query, hierarchy, countries, categories, stats, getStatus, hasStream, pickStream } from './catalog.js';
+import { loadCatalog, query, hierarchy, countries, stats, getStatus, pickStream } from './catalog.js';
 
 const CDN = {
   hls: 'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js',
@@ -16,11 +20,9 @@ const CDN = {
 };
 
 const PRESETS_KEY = 'prism.presets';
-const FAVS_KEY = 'prism.favs';
 const DEFAULT_SOURCE = 'https://propee33f9c2.airspace-cdn.cbsivideo.com/index.m3u8';
-const BRAND_CAP = 300;
 
-/* ---------------- utils ---------------- */
+/* ================= utils ================= */
 const loadedScripts = new Map();
 function loadScript(src) {
   if (!loadedScripts.has(src)) loadedScripts.set(src, new Promise((ok, bad) => {
@@ -30,50 +32,19 @@ function loadScript(src) {
   }));
   return loadedScripts.get(src);
 }
-const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
-const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const chip = (size = '') => `<i class="fas fa-microchip fa-spin spin-chip ${size}"></i>`;
 
 function getPresets() { try { return JSON.parse(localStorage.getItem(PRESETS_KEY)) || []; } catch { return []; } }
 function savePresets(l) { try { localStorage.setItem(PRESETS_KEY, JSON.stringify(l.slice(0, 30))); } catch {} }
-function getFavs() { try { return new Set(JSON.parse(localStorage.getItem(FAVS_KEY)) || []); } catch { return new Set(); } }
-function saveFavs(set) { try { localStorage.setItem(FAVS_KEY, JSON.stringify([...set])); } catch {} }
 
-/* logo map: lazy-loaded id→url table */
-const logoMap = new Map();
-let logosRequested = false;
-function requestLogos(onReady) {
-  if (logosRequested) return;
-  logosRequested = true;
-  setTimeout(async () => {
-    try {
-      const r = await fetch('/logos.json');
-      if (r.ok) {
-        const data = await r.json();
-        for (const [id, url] of Object.entries(data)) logoMap.set(id, url);
-        onReady?.();
-      }
-    } catch { /* logos are cosmetic — never fatal */ }
-  }, 1800);
-}
-function logoFor(id) { return logoMap.get(id) || ''; }
-function flagFor(cc) { return cc?.length === 2 ? `https://flagcdn.com/w40/${cc.toLowerCase()}.png` : ''; }
-
-/* toast */
-let toastEl = null;
-function toast(msg) {
-  if (!toastEl) { toastEl = el('div', 'toast'); document.body.appendChild(toastEl); }
-  toastEl.textContent = msg;
-  toastEl.classList.add('show');
-  clearTimeout(toastEl._h);
-  toastEl._h = setTimeout(() => toastEl.classList.remove('show'), 2200);
-}
-
-/* ---------------- popovers ---------------- */
+/* ================= popovers ================= */
 let openPopover = null;
 function closeOpenPopover() { if (openPopover) { openPopover.remove(); openPopover = null; } }
 document.addEventListener('pointerdown', e => { if (openPopover && !openPopover.contains(e.target)) closeOpenPopover(); }, true);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOpenPopover(); });
+
 function showAbove(anchor, node) {
   closeOpenPopover();
   document.body.appendChild(node);
@@ -98,7 +69,7 @@ export function createSourceMenu(win, anchorBtn) {
     </div>
     <input type="file" accept="video/*,audio/*,.mkv,.m3u8" style="display:none" />
     <div class="menu-divider"></div>
-    <div class="popover-hint">Or tap a channel in the CHANNELS dock.</div>`;
+    <div class="popover-hint">Or tap a channel in the CHANNELS dock — it plays in the focused window.</div>`;
   const input = menu.querySelector('.url-input');
   menu.querySelector('[data-act="play"]').addEventListener('click', () => {
     const v = input.value.trim(); if (!v) return;
@@ -145,7 +116,7 @@ export function createPresetMenu(getWin, anchorBtn) {
     }));
     menu.querySelector('[data-act="save"]').addEventListener('click', () => {
       const url = getWin().currentUrl;
-      if (!url) { toast('Nothing is playing yet'); return; }
+      if (!url) return;
       const nameEl = menu.querySelector('.preset-name-input');
       const list = getPresets();
       list.unshift({ name: nameEl.value.trim() || url.split('/').pop().slice(0, 32), url });
@@ -159,7 +130,7 @@ export function createPresetMenu(getWin, anchorBtn) {
   });
 }
 
-/* ---------------- player window ---------------- */
+/* ================= player window ================= */
 let zTop = 500;
 
 export function createWindow({ stage, title = 'LIVE' }) {
@@ -236,8 +207,10 @@ export function createWindow({ stage, title = 'LIVE' }) {
     destroy() { teardown(); cell.remove(); },
   };
 
+  /* drag (mouse + touch) */
   bar_drag(api, cell.querySelector('.pwin-bar'), stage);
   cell.addEventListener('pointerdown', () => api.focus());
+
   createSourceMenu(api, cell.querySelector('.pwin-src'));
 
   const n = stage.querySelectorAll('.pwin').length;
@@ -268,8 +241,8 @@ function bar_drag(api, bar, stage) {
   });
 }
 
-/* ---------------- layout ---------------- */
-function applyLayout(stage, wins, mode) {
+/* ================= layout + dynamic stage ================= */
+function applyLayout(stage, wins, mode, fit) {
   if (mode !== 'free') {
     const [cols, rows] = mode.split('x').map(Number);
     const gap = 0.9;
@@ -278,9 +251,10 @@ function applyLayout(stage, wins, mode) {
     wins.forEach((w, i) => {
       if (i >= cols * rows) { w.cell.style.opacity = '.25'; return; }
       w.cell.style.opacity = '';
+      const col = i % cols, row = Math.floor(i / cols);
       Object.assign(w.cell.style, {
-        left: `${gap + (i % cols) * (cw + gap)}%`,
-        top: `${gap + Math.floor(i / cols) * (ch + gap)}%`,
+        left: `${gap + col * (cw + gap)}%`,
+        top: `${gap + row * (ch + gap)}%`,
         width: `${cw}%`, height: `${ch}%`,
       });
       w.cell.classList.add('snapped');
@@ -300,147 +274,48 @@ function fitStage(stage, wins, mode) {
     }
   } else {
     const [cols, rowsCap] = mode.split('x').map(Number);
-    const rows = Math.max(1, Math.ceil(wins.length / cols));   // shrink with fewer players
+    const usedRows = Math.max(1, Math.ceil(wins.length / cols), Math.min(rowsCap, wins.length ? rowsCap : 1));
     const cw = (stage.clientWidth - 12 * (cols + 1)) / cols;
-    h = rows * (cw * 9 / 16 + 42) + 12 * (rows + 1);
-    void rowsCap;
+    h = usedRows * (cw * 9 / 16 + 42) + 12 * (usedRows + 1);
   }
   stage.style.height = `${Math.round(Math.max(h, 240))}px`;
 }
 
-/* ---------------- grouping modes ---------------- */
-function groupChannels(list, mode) {
-  /* returns Map<groupLabel, Map<subLabel|null, channel[]>> */
-  if (mode === 'category') {
-    const top = new Map();
-    for (const c of list) {
-      const cats = (c.categories || []).filter(Boolean);
-      const keys = cats.length ? cats.slice(0, 2) : ['general'];
-      for (const k of keys) {
-        if (!top.has(k)) top.set(k, new Map());
-        const bk = brandOf(c);
-        const m = top.get(k);
-        if (!m.has(bk)) m.set(bk, []);
-        m.get(bk).push(c);
-      }
-    }
-    return new Map([...top.entries()].sort((a, b) => b[1].size - a[1].size || a[0].localeCompare(b[0])));
-  }
-  if (mode === 'country') {
-    const top = new Map();
-    for (const c of list) {
-      const k = (c.country || '??').toUpperCase();
-      if (!top.has(k)) top.set(k, new Map());
-      const bk = brandOf(c);
-      const m = top.get(k);
-      if (!m.has(bk)) m.set(bk, []);
-      m.get(bk).push(c);
-    }
-    return new Map([...top.entries()].sort((a, b) => a[0].localeCompare(b[0])));
-  }
-  // default: A-Z letters -> brands
-  const letters = new Map();
-  for (const c of list) {
-    const bk = brandOf(c);
-    const L = /^[A-Z]/.test(bk[0]) ? bk[0] : '#';
-    if (!letters.has(L)) letters.set(L, new Map());
-    const brands = letters.get(L);
-    if (!brands.has(bk)) brands.set(bk, []);
-    brands.get(bk).push(c);
-  }
-  return new Map([...letters.entries()].sort((a, b) => a[0].localeCompare(b[0])));
-}
-
-const QUALIFIERS = new Set(['PLUS', 'EXTRA', 'HD', 'FHD', 'SD', 'UHD', '4K', '8K', 'EAST', 'WEST', 'NORTH', 'SOUTH', 'FEED']);
-const NUMBERY = /^\+?\d+(\.\d+)?$/;
-function brandOf(c) {
-  if (c.brand) return c.brand;
-  let s = String(c.name || '').toUpperCase()
-    .replace(/[\u2019'`]/g, '')
-    .replace(/\([^\)]*\)|\[[^\]]*\]|\{[^\}]*\}/g, ' ')
-    .split(/[|•·–—:\/\\]/)[0]
-    .replace(/[^A-Z0-9]+/g, ' ').trim();
-  let toks = s.split(/\s+/).filter(Boolean);
-  while (toks.length > 1 && (QUALIFIERS.has(toks.at(-1)) || NUMBERY.test(toks.at(-1)))) toks.pop();
-  c.brand = toks.join(' ') || String(c.name || '?').toUpperCase().trim() || '?';
-  return c.brand;
-}
-
-/* ---------------- tree renderer ---------------- */
-function renderTree(container, opts, favs, onToggleFav) {
-  /* preserve which nodes were open */
-  const openKeys = new Set(
-    [...container.querySelectorAll('details[open]')].map(d => d.dataset.k));
-
+/* ================= channel tree ================= */
+function renderTree(container, opts) {
+  const list = query(opts);
+  const letters = hierarchy(list);
   container.replaceChildren();
 
-  /* pinned FAVORITES group */
-  if (favs.size) {
-    const favChans = opts.all.filter(c => favs.has(c.id));
-    const det = el('details', 'tree-letter fav-group');
-    det.dataset.k = '★FAV';
-    if (openKeys.has('★FAV')) det.open = true;
-    det.appendChild(el('summary', null,
-      `<span class="tree-letter-mark">★</span><span class="tree-group-name">FAVORITES</span><span class="count">${favChans.length}</span>`));
-    for (const ch of favChans.sort((a, b) => a.name.localeCompare(b.name)))
-      det.appendChild(channelButton(ch, favs, onToggleFav, opts.onPlay));
-    container.appendChild(det);
+  if (!list.length) {
+    container.appendChild(el('div', 'tree-empty',
+      opts.workingOnly
+        ? 'No verified-working matches. Untick WORKING to see untested channels.'
+        : 'Nothing matches.'));
+    return;
   }
 
-  const grouped = groupChannels(opts.list, opts.sort);
-  for (const [g, subs] of grouped) {
-    let count = 0; for (const l of subs.values()) count += l.length;
-    const det = el('details', `tree-letter g-${opts.sort}`);
-    det.dataset.k = 'G:' + g;
-    if (openKeys.has(det.dataset.k)) det.open = true;
+  for (const [L, brands] of [...letters.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    let count = 0; for (const bl of brands.values()) count += bl.length;
+    const det = el('details', 'tree-letter');
     det.appendChild(el('summary', null,
-      `<span class="tree-letter-mark">${esc(g)}</span><span class="count">${count.toLocaleString()}</span>`));
-    for (const [sub, chans] of [...subs.entries()].sort((a, b) =>
-      (b.length - a.length) || a[0].localeCompare(b[0]))) {
+      `<span class="tree-letter-mark">${esc(L)}</span><span class="count">${count.toLocaleString()}</span>`));
+    for (const [bk, chans] of [...brands.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
       const bd = el('details', 'tree-brand');
-      bd.dataset.k = `G:${g}|${sub}`;
-      if (openKeys.has(bd.dataset.k)) bd.open = true;
       bd.appendChild(el('summary', null,
-        `<span class="tree-brand-name">${esc(sub)}</span><span class="count">${chans.length.toLocaleString()}</span>`));
-      for (const ch of chans.slice(0, BRAND_CAP))
-        bd.appendChild(channelButton(ch, favs, onToggleFav, opts.onPlay));
-      if (chans.length > BRAND_CAP)
-        bd.appendChild(el('div', 'tree-more', `+${(chans.length - BRAND_CAP).toLocaleString()} more…`));
+        `<span class="tree-brand-name">${esc(bk)}</span><span class="count">${chans.length}</span>`));
+      for (const ch of chans.slice(0, 80)) {
+        const st = getStatus(ch.id);
+        const b = el('button', 'tree-channel', `<span class="dot ${st}"></span>${esc(ch.name)}`);
+        b.title = ch.name;
+        b.addEventListener('click', () => opts.onPlay(ch));
+        bd.appendChild(b);
+      }
+      if (chans.length > 80) bd.appendChild(el('div', 'tree-more', `+${(chans.length - 80).toLocaleString()} more…`));
       det.appendChild(bd);
     }
     container.appendChild(det);
   }
-
-  if (!container.children.length)
-    container.appendChild(el('div', 'tree-empty',
-      opts.workingOnly ? 'No verified-working matches. Untick WORKING to widen the net.'
-        : 'Nothing matches.'));
-}
-
-function channelButton(ch, favs, onToggleFav, onPlay) {
-  const st = getStatus(ch.id);
-  const stream = hasStream(ch.id);
-  const b = el('button', 'tree-channel' + (stream ? '' : ' nostream'));
-  const logo = logoFor(ch.id);
-  const flag = !logo ? flagFor(ch.country) : '';
-  b.innerHTML = `
-    <span class="dot ${st}${stream ? '' : ' none'}"></span>
-    ${logo ? `<img class="ch-logo" loading="lazy" src="${esc(logo)}" onerror="this.replaceWith(document.createTextNode(''))" alt="">`
-           : flag ? `<img class="ch-flag" loading="lazy" src="${flag}" onerror="this.style.display='none'" alt="">`
-                  : ''}
-    <span class="tree-ch-name">${esc(ch.name)}</span>
-    <button class="fav-star${favs.has(ch.id) ? ' on' : ''}" title="${favs.has(ch.id) ? 'Unfavorite' : 'Favorite'}">★</button>`;
-  b.title = ch.name + (stream ? '' : ' · no stream');
-  b.addEventListener('click', e => {
-    if (e.target.closest('.fav-star')) return;
-    if (!stream) { toast(`NO STREAM FOR ${ch.name.toUpperCase().slice(0, 26)}`); return; }
-    onPlay(ch);
-  });
-  b.querySelector('.fav-star').addEventListener('click', e => {
-    e.stopPropagation();
-    onToggleFav(ch.id);
-  });
-  return b;
 }
 
 /* ================= bootstrap ================= */
@@ -452,22 +327,37 @@ export function mountPrism({
   document.title = title;
 
   /* ---------- stage ---------- */
+  const toolbar = el('div', 'stage-toolbar');
+  toolbar.innerHTML = `
+    <button class="strip-btn primary" id="addWin"><i class="fas fa-plus"></i> PLAYER</button>
+    <select class="strip-btn" id="layoutSel">
+      <option value="free">FREE PLACE</option>
+      <option value="1x1">1×1</option>
+      <option value="2x2" selected>2×2</option>
+      <option value="3x2">3×2</option><option value="2x3">2×3</option>
+      <option value="4x2">4×2</option><option value="2x4">2×4</option>
+    </select>
+    <button class="strip-btn" id="srcBtn"><i class="fas fa-plug"></i> SOURCES</button>
+    <button class="strip-btn danger" id="closeAll">CLOSE ALL</button>
+    <span class="win-count" id="winCount">0</span>`;
   const stage = el('div', 'stage-area');
   const emptyState = el('div', 'stage-empty',
     `<button class="stage-add">${chip('big')}<span>+ PLAYER</span></button>`);
   stage.appendChild(emptyState);
 
   const main = el('div', 'app');
-  main.appendChild(stage);
+  main.append(toolbar, stage);
   target.appendChild(main);
 
+  /* ---------- windows ---------- */
   const wins = [];
-  let layoutMode = '2x2';
+  let layoutMode = 'free';
 
   function refreshChrome() {
     emptyState.style.display = wins.length ? 'none' : '';
     document.getElementById('winCount').textContent =
       `${wins.length} WINDOW${wins.length === 1 ? '' : 'S'}`;
+    document.getElementById('closeAll').style.display = wins.length ? '' : 'none';
     fitStage(stage, wins, layoutMode);
   }
 
@@ -486,11 +376,11 @@ export function mountPrism({
     return w;
   }
 
+  document.getElementById('addWin').addEventListener('click', () => addPlayer());
   emptyState.querySelector('.stage-add').addEventListener('click', () => addPlayer());
   document.getElementById('closeAll').addEventListener('click', () => {
     while (wins.length) wins[0].close();
   });
-  document.getElementById('addWin').addEventListener('click', () => addPlayer());
   document.getElementById('layoutSel').addEventListener('change', e => {
     layoutMode = e.target.value;
     applyLayout(stage, wins, layoutMode);
@@ -500,42 +390,17 @@ export function mountPrism({
   const focused = () => wins.reduce((a, b) =>
     (+a.cell.style.zIndex || 0) >= (+b.cell.style.zIndex || 0) ? a : b, wins[0]);
 
-  /* ---------- favorites ---------- */
-  const favs = getFavs();
-  function toggleFav(id) {
-    favs.has(id) ? favs.delete(id) : favs.add(id);
-    saveFavs(favs);
-    rerenderTree();
-    updateDockMeta();
-  }
-
-  /* ---------- bottom dock ---------- */
+  /* ---------- bottom dock: CHANNELS ---------- */
   const dock = el('div', 'dock');
   const dockBar = el('button', 'dock-bar',
     `<span class="dock-brand">α<span>prism</span></span>
-     <span class="dock-meta" id="dockMeta">${chip('sm')} LOADING…</span>
-     <span class="dock-tools">
-       <button class="dock-tool primary" id="addWin" title="New player"><i class="fas fa-plus"></i></button>
-       <select class="dock-tool" id="layoutSel" title="Snap grid">
-         <option value="free">FREE</option><option value="1x1">1×1</option>
-         <option value="2x2" selected>2×2</option><option value="3x2">3×2</option>
-         <option value="2x3">2×3</option><option value="4x2">4×2</option>
-         <option value="2x4">2×4</option>
-       </select>
-       <button class="dock-tool" id="srcBtn" title="Saved sources"><i class="fas fa-plug"></i></button>
-       <button class="dock-tool danger" id="closeAll" title="Close all players"><i class="fas fa-xmark"></i></button>
-     </span>
+     <span class="dock-meta" id="dockMeta">${chip('sm')} LOADING CATALOG…</span>
      <i class="fas fa-chevron-up dock-chev"></i>`);
   const sheet = el('div', 'dock-sheet');
   const filters = el('div', 'tree-filters');
   filters.innerHTML = `
     <input id="treeQ" class="url-input tree-q" type="search" placeholder="⌕ search channels…" />
-    <select id="sortSel" class="strip-btn tree-sort" title="Sort mode">
-      <option value="az" selected>A–Z</option>
-      <option value="category">CATEGORY</option>
-      <option value="country">COUNTRY</option>
-    </select>
-    <select id="treeC" class="strip-btn tree-country" title="Country"><option value="all">🌍</option></select>
+    <select id="treeC" class="strip-btn tree-country"><option value="all">🌍 ALL</option></select>
     <label class="tree-working"><input type="checkbox" id="treeW" checked /> WORKING</label>`;
   const treeBox = el('div', 'tree-box', `<div class="tree-boot">${chip('big')}<div>LOADING CATALOG…</div></div>`);
   sheet.append(filters, treeBox);
@@ -546,18 +411,26 @@ export function mountPrism({
   function setDock(open) {
     dockOpen = open;
     dock.classList.toggle('open', open);
-    dockBar.querySelector('.dock-chev').className = `fas fa-chevron-${open ? 'down' : 'up'} dock-chev`;
+    dockBar.querySelector('.dock-chev').className =
+      `fas fa-chevron-${open ? 'down' : 'up'} dock-chev`;
+    document.body.classList.toggle('dock-open', open);
   }
-  dockBar.addEventListener('click', e => {
-    if (e.target.closest('.dock-tool')) return;   // tool clicks don't toggle drawer
-    setDock(!dockOpen);
-  });
+  dockBar.addEventListener('click', () => setDock(!dockOpen));
 
-  /* tree state + render */
-  const treeOpts = { q: '', country: 'all', workingOnly: true, sort: 'az', all: [] };
+  /* tree interactions */
+  const treeOpts = { q: '', country: 'all', workingOnly: true };
   function rerenderTree() {
-    treeOpts.list = query(treeOpts);
-    renderTree(treeBox, treeOpts, favs, toggleFav);
+    renderTree(treeBox, {
+      ...treeOpts,
+      onPlay(ch) {
+        const url = pickStream(ch.id);
+        if (!url) return;
+        const w = wins.length ? focused() : addPlayer();
+        w.load(url);
+        w.setTitle(ch.name.slice(0, 30));
+        if (matchMedia('(max-width:820px)').matches) setDock(false);
+      },
+    });
   }
   let qT;
   filters.querySelector('#treeQ').addEventListener('input', e => {
@@ -566,16 +439,8 @@ export function mountPrism({
   });
   filters.querySelector('#treeW').addEventListener('change', e => { treeOpts.workingOnly = e.target.checked; rerenderTree(); });
   filters.querySelector('#treeC').addEventListener('change', e => { treeOpts.country = e.target.value; rerenderTree(); });
-  filters.querySelector('#sortSel').addEventListener('change', e => { treeOpts.sort = e.target.value; rerenderTree(); });
 
   createPresetMenu(focused, document.getElementById('srcBtn'));
-
-  function updateDockMeta() {
-    const s = stats();
-    document.getElementById('dockMeta').innerHTML =
-      `<b>${s.totalAll.toLocaleString()}</b> CH · <span>${s.ready.toLocaleString()} ready</span>` +
-      ` · <b class="ok">${s.working.toLocaleString()} ✓</b>${favs.size ? ` · <b style="color:var(--accent-secondary)">★${favs.size}</b>` : ''}`;
-  }
 
   /* ---------- boot ---------- */
   (async () => {
@@ -584,15 +449,12 @@ export function mountPrism({
         treeBox.innerHTML = `<div class="tree-boot">${chip('big')}<div>${esc(m || 'working…')}</div></div>`;
         document.getElementById('dockMeta').innerHTML = `${chip('sm')} ${esc(m || 'loading…')}`;
       });
-      treeOpts.all = [];
       filters.querySelector('#treeC').insertAdjacentHTML('beforeend',
-        countries().slice(0, 60)
+        countries().slice(0, 40)
           .map(([code, n]) => `<option value="${code}">${code.toUpperCase()} (${n.toLocaleString()})</option>`).join(''));
-      treeOpts.all = query({ q: '', country: 'all', workingOnly: false });
       rerenderTree();
-      updateDockMeta();
-      requestLogos(rerenderTree);   // cosmetic pass once the map lands
-      toast(`${s.totalAll.toLocaleString()} CHANNELS · ${s.working.toLocaleString()} VERIFIED`);
+      document.getElementById('dockMeta').innerHTML =
+        `<b>${s.totalAll.toLocaleString()}</b> indexed · <span>${s.total.toLocaleString()} ready</span> · <b class="ok">${s.working.toLocaleString()} verified</b>`;
     } catch (e) {
       treeBox.innerHTML = `<div class="tree-boot">⚠ catalog failed: ${esc(e.message)}</div>`;
       document.getElementById('dockMeta').textContent = 'catalog offline — players still work';
@@ -600,5 +462,5 @@ export function mountPrism({
     addPlayer(new URLSearchParams(location.search).get('src') || defaultSource);
   })();
 
-  return { app: main, addPlayer, wins, rerenderTree, setDock, player() { return focused(); } };
+  return { app: main, addPlayer, wins, rerenderTree, setDock, get player() { return focused(); } };
 }
