@@ -236,7 +236,7 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
     workPill.style.whiteSpace = 'normal';
     workPill.style.fontSize = '9px';
     workPill.style.padding = '1px 0';
-    workPill.style.maxWidth = '40px';
+    workPill.style.maxWidth = '120px';
     workPill.addEventListener('click', () => {
       workingOnly = !workingOnly;
       renderPills(); rerenderList();
@@ -267,6 +267,7 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
     });
     pillBar.appendChild(countryBtn);
     const dropdown = el('div', 'country-dropdown');
+    pillBar.style.position = 'relative';
     // ALL option
     const allOpt = el('div', 'country-dropdown-item',
       `🌍 ALL (${ALL.length})`);
