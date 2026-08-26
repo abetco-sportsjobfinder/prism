@@ -198,3 +198,30 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .poker-chip { animation-duration: 3s !important; }
 }
+
+
+/* ---------- R4a: working/country filter bar ---------- */
+.filter-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(0,184,212,.09);
+  background: rgba(0,45,114,.08);
+}
+.f-work {
+  display: flex; gap: 6px; align-items: center;
+  font-size: 11px; color: var(--text-muted);
+  cursor: pointer; white-space: nowrap; letter-spacing: .5px;
+}
+.f-work input { accent-color: var(--accent-primary); width: 15px; height: 15px; }
+.f-country {
+  background: var(--bg-darker); border: 1px solid var(--border-color);
+  color: var(--text-light); font-family: inherit; font-size: 12px;
+  padding: 6px 10px; min-height: 34px; border-radius: 6px; cursor: pointer;
+}
+option { background: #070B0F; color: #E6F4FF; }
+select { color-scheme: dark; }
+
+@media (max-width:640px) {
+  .filter-bar { flex-wrap: wrap; }
+  .f-country, .f-work { min-height: 40px; }
+}

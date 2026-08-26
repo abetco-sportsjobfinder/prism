@@ -190,10 +190,6 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
     </button>
     <div class="collapse-body" id="collapseBody">
       <div class="pill-bar" id="pillBar"></div>
-      <div class="filter-bar">
-        <label class="f-work"><input type="checkbox" id="workChk" /> WORKING</label>
-        <select id="countrySel" class="f-country"><option value="all">🌍 ALL</option></select>
-      </div>
       <div class="ch-list" id="chList"></div>
       <div class="list-more-wrap"><button class="list-more" id="listMore">SHOW MORE</button></div>
     </div>`;
@@ -213,13 +209,7 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
   let rendered = 0;
   let expanded = true;
   let activeCat = 'all';
-  let workingOnly = false;
-  let country = 'all';
   let open = false;
-
-  /* ---------- refs for filters ---------- */
-  const workChk = section.querySelector('#workChk');
-  const countrySel = section.querySelector('#countrySel');
 
   /* ---------- collapse toggle ---------- */
   function setOpen(v) {
@@ -230,9 +220,6 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
     if (open) appendChunk();
   }
   section.querySelector('#secHeader').addEventListener('click', () => setOpen(!open));
-
-  workChk.addEventListener('change', () => { workingOnly = workChk.checked; rerenderList(); });
-  countrySel.addEventListener('change', () => { country = countrySel.value; rerenderList(); });
 
   /* ---------- category pills ---------- */
   const CAT_ORDER = ['all', 'sports', 'news', 'movies', 'kids', 'music', 'entertainment', 'documentary', 'series', 'general'];
@@ -268,8 +255,6 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
     let out = ALL;
     if (activeCat !== 'all')
       out = out.filter(c => (c.categories || []).map(x => x.toLowerCase()).includes(activeCat));
-    if (workingOnly) out = out.filter(c => hasStream(c.id) && getStatus(c.id) === 'working');
-    if (country !== 'all') out = out.filter(c => c.country === country);
     return out;
   }
 
@@ -335,16 +320,8 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
       ALL = [...db.channels].sort((a, b) =>
         ((hasStream(b.id) ? 0 : 1) - (hasStream(a.id) ? 0 : 1)) ||
         (a.rank - b.rank) || a.name.localeCompare(b.name));
-      // populate country filter
-      const cc = new Map();
-      for (const c of ALL) {
-        if (c.country?.length === 2) cc.set(c.country, (cc.get(c.country) || 0) + 1);
-      }
-      for (const [code, n] of [...cc.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60)) {
-        countrySel.insertAdjacentHTML('beforeend',
-          `<option value="${esc(code)}">${esc(code.toUpperCase())} (${n.toLocaleString()})</option>`);
-      }
-      renderPills(getActiveCats());
+      const cats = getActiveCats();
+      renderPills(cats);
       rerenderList();
       requestLogos(() => refreshLogos());
       list.appendChild(sentinel);
