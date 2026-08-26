@@ -229,10 +229,13 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
   function renderPills() {
     pillBar.replaceChildren();
 
-    // WORKING STREAMS toggle
+    // WORKING STREAMS toggle — compact single line
     const workPill = el('button',
       'cat-pill pill-work' + (workingOnly ? ' on' : ''),
-      '◉ WORKING STREAMS');
+      'WORKING ONLY');
+    workPill.style.whiteSpace = 'normal';
+    workPill.style.fontSize = '9px';
+    workPill.style.padding = '1px 0';
     workPill.addEventListener('click', () => {
       workingOnly = !workingOnly;
       renderPills(); rerenderList();
@@ -242,18 +245,43 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
     // separator
     pillBar.appendChild(el('span', 'pill-sep'));
 
-    // top countries (by channel count)
+    // top countries (by channel count) — DROPDOWN
     const cc = new Map();
     for (const c of ALL) {
       if (c.country?.length === 2) cc.set(c.country, (cc.get(c.country) || 0) + 1);
     }
     const topCC = [...cc.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15);
-    // ALL countries pill
-    addPill(pillBar, country === 'all', '🌍 ALL', country === 'all', () => { country = 'all'; renderPills(); rerenderList(); });
+    // country dropdown button
+    const countryBtn = el('button',
+      'cat-pill pill-country' + (country !== 'all' ? ' on' : ''),
+      country === 'all' ? '🌍 COUNTRY' : `${country.toUpperCase()} (${topCC.find(c => c[0] === country)?.[1] || 0})`);
+    countryBtn.style.whiteSpace = 'nowrap';
+    countryBtn.style.fontSize = '10px';
+    countryBtn.style.lineHeight = '1.2';
+    countryBtn.style.width = 'auto';
+    countryBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle('open');
+    });
+    pillBar.appendChild(countryBtn);
+    const dropdown = el('div', 'country-dropdown');
+    // ALL option
+    const allOpt = el('div', 'country-dropdown-item',
+      `🌍 ALL (${ALL.length})`);
+    allOpt.addEventListener('click', () => { country = 'all'; renderPills(); rerenderList(); dropdown.classList.remove('open'); });
+    dropdown.appendChild(allOpt);
+    // top countries
     for (const [code, n] of topCC) {
-      addPill(pillBar, code, `${code.toUpperCase()} ${n.toLocaleString()}`, country === code,
-        () => { country = country === code ? 'all' : code; renderPills(); rerenderList(); });
+      const opt = el('div', 'country-dropdown-item',
+        `${code.toUpperCase()} (${n})`);
+      opt.addEventListener('click', () => { country = code; renderPills(); rerenderList(); dropdown.classList.remove('open'); });
+      dropdown.appendChild(opt);
     }
+    // click outside to close
+    document.addEventListener('click', (e) => {
+      if (!countryBtn.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('open');
+    });
+    pillBar.appendChild(dropdown);
 
     // separator
     pillBar.appendChild(el('span', 'pill-sep'));

@@ -260,3 +260,18 @@ select { color-scheme: dark; }
   font-size: 12px; font-weight: 700; color: var(--text-muted);
   background: rgba(0,184,212,.1); flex-shrink: 0;
 }
+
+/* ---------- country dropdown ---------- */
+.country-dropdown {
+  position: absolute; top: 100%; left: 0; min-width: 160px;
+  background: var(--bg-dark); border: 1px solid var(--border-color);
+  border-radius: 4px; padding: 6px 0; z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,.3); display: none;
+}
+.country-dropdown.open { display: block; }
+.country-dropdown-item {
+  padding: 6px 12px; font-size: 11px; color: var(--text); white-space: nowrap;
+  cursor: pointer; transition: background .15s;
+}
+.country-dropdown-item:hover { background: var(--hover); }
+.country-dropdown-item:active { background: var(--active); }
