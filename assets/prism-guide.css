@@ -1,0 +1,104 @@
+/* ============================================================
+   PRISM guide-specific styles (GUIDE-UX-A1)
+   Only styling the guide module introduces. Base tokens/chrome
+   live in assets/prism.css (ABET design system).
+   ============================================================ */
+
+.guide-search-row {
+  position: sticky; top: 0; z-index: 6;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-darker);
+  border-bottom: 1px solid rgba(0,184,212,.15);
+}
+.guide-search {
+  flex: 1; min-width: 160px; font-size: 16px;   /* 16px prevents iOS zoom */
+  min-height: 42px;
+}
+.guide-counts {
+  font-size: 11px; letter-spacing: 1px;
+  color: var(--text-muted); text-transform: uppercase;
+  white-space: nowrap;
+}
+.guide-counts b { color: var(--text-light); }
+
+.drawer-body { padding-bottom: 8px; }
+
+/* category rows */
+.guide-row { margin-top: 4px; }
+.guide-row-title {
+  padding: 10px 14px 4px; font-size: 11px; letter-spacing: 1.5px;
+  color: var(--text-muted); text-transform: uppercase;
+}
+.guide-row-title .count { color: var(--accent-primary); }
+.guide-cards {
+  display: flex; gap: 10px; overflow-x: auto;
+  padding: 2px 14px 12px; scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+.guide-cards::-webkit-scrollbar { height: 6px; }
+.gcard {
+  flex: 0 0 148px; scroll-snap-align: start; position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  background: #12151d; border: 1px solid var(--border-color);
+  border-radius: 12px; padding: 10px 8px 8px; cursor: pointer;
+  transition: transform .18s, border-color .18s, box-shadow .18s;
+  min-height: 106px;
+}
+.gcard:hover {
+  border-color: var(--accent-primary); transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0,184,212,.25);
+}
+.gcard-media {
+  height: 42px; width: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 800; color: var(--text-muted);
+}
+.gcard-media img { max-height: 42px; max-width: 92%; object-fit: contain; }
+.gcard-name {
+  font-size: 11px; line-height: 1.25; text-align: center;
+  color: var(--text-light); max-height: 28px; overflow: hidden;
+}
+.gcard .dot {
+  position: absolute; top: 7px; right: 8px;
+  width: 8px; height: 8px; border-radius: 50%; background: #39424f;
+}
+.gcard .dot.working { background: #00ff88; box-shadow: 0 0 5px rgba(0,255,136,.7); }
+.gcard.dead { opacity: .55; }
+
+/* reveal / show-more buttons */
+.guide-more, .guide-more-sm {
+  background: var(--menu-bg); border: 1px solid var(--border-color);
+  color: var(--text-light); font-family: inherit; font-size: 12px;
+  font-weight: 600; letter-spacing: .5px;
+  min-height: 38px; padding: 0 14px; border-radius: 6px; cursor: pointer;
+  transition: all .2s;
+}
+.guide-more:hover, .guide-more-sm:hover {
+  background: rgba(0,184,212,.3); border-color: var(--accent-primary);
+}
+.guide-more { width: calc(100% - 28px); margin: 6px 14px 12px; }
+.guide-more-sm { align-self: center; }
+
+/* empty + reset */
+.guide-empty { padding: 26px 14px 20px; text-align: center; }
+.empty-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.empty-filters { font-size: 11px; color: var(--text-muted); margin-bottom: 14px; }
+.guide-reset {
+  background: var(--accent-secondary); border: none; color: #000;
+  font-family: inherit; font-size: 12px; font-weight: 700;
+  letter-spacing: 1px; padding: 10px 22px; border-radius: 999px; cursor: pointer;
+}
+.guide-reset:hover { box-shadow: 0 0 14px rgba(255,214,0,.5); }
+
+/* mobile */
+@media (max-width: 640px) {
+  .guide-search-row { flex-wrap: wrap; }
+  .guide-search { min-height: 44px; }
+  .gcard { flex-basis: 132px; }
+  .guide-counts { font-size: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gcard, .guide-more, .guide-more-sm, .guide-reset { transition: none; }
+}

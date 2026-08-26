@@ -8,6 +8,7 @@
    ============================================================ */
 
 import { loadCatalog, db, countries, categories, stats, getStatus, hasStream, pickStream } from './catalog.js';
+import { createGuide } from './prism-guide.js';
 
 const CDN = {
   hls: 'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js',
@@ -252,24 +253,6 @@ function brandOf(c) {
   return c.brand;
 }
 
-function gcard(ch, onPlay) {
-  const st = getStatus(ch.id);
-  const stream = hasStream(ch.id);
-  const card = el('button', 'gcard' + (stream ? '' : ' dead'));
-  const logo = logoFor(ch.id) || flagFor(ch.country);
-  card.innerHTML = `
-    <span class="gcard-media">${logo
-      ? `<img loading="lazy" src="${esc(logo)}" alt="">`
-      : esc((ch.name || '?')[0].toUpperCase())}</span>
-    <span class="gcard-name">${esc(ch.name)}</span>
-    <span class="dot ${st}${stream ? '' : ' none'}"></span>`;
-  card.title = ch.name;
-  card.addEventListener('click', () => {
-    if (!stream) { toast(`NO STREAM FOR ${ch.name.toUpperCase().slice(0, 24)}`); return; }
-    onPlay(ch);
-  });
-  return card;
-}
 
 /* ================= bootstrap ================= */
 export function mountPrism({ target, title = 'prism | α', defaultSource = DEFAULT_SOURCE } = {}) {
@@ -313,20 +296,38 @@ export function mountPrism({ target, title = 'prism | α', defaultSource = DEFAU
     <span class="dock-meta" id="dockMeta">${chipHTML('LOADING')}</span>`;
 
   const drawer = el('div', 'drawer');
-  const catWrap = el('div', 'cat-wrap');
-  const azWrap = el('div', 'az-wrap');
-  drawer.append(catWrap, azWrap);
   dock.append(dockBar, drawer);
 
   main.append(dock);
   target.appendChild(main);
 
+  /* ---------- GUIDE-UX-A1 seam: guide owns filter/sort/render ---------- */
+  const guide = createGuide({
+    host: drawer,
+    controls: { workChk: $('workChk'), sortSel: $('sortSel'), countrySel: $('countrySel') },
+    data: {
+      getChannels: () => db.channels,
+      getStatus,
+      hasStream,
+      getCountries: () => countries(),
+    },
+    pickStream,
+    logos: { for: logoFor, flag: flagFor },
+    favs,
+    onPlay: payload => playUrlFocused(payload),
+    onPlayNew: payload => playUrlNewWindow(payload),
+    onToggleFav: toggleFav,
+  });
+  document.addEventListener('prism:drawer', e => {
+    if (e.detail && e.detail.open === false) setDrawer(false);
+  });
+  document.addEventListener('prism:toast', e => {
+    if (e.detail && e.detail.msg) toast(e.detail.msg);
+  });
+
   /* ---------- state ---------- */
   const wins = [];
   let layoutMode = 'full';
-  let sortMode = 'category';           // boots on CATEGORY per spec
-  let country = 'all';
-  let workingOnly = true;
   const favs = getFavs();
 
   const $ = id => document.getElementById(id);
@@ -420,124 +421,30 @@ export function mountPrism({ target, title = 'prism | α', defaultSource = DEFAU
   function toggleFav(id) {
     favs.has(id) ? favs.delete(id) : favs.add(id);
     saveFavs(favs);
-    rerenderDrawer();
-    updateMeta();
+    guide.rerender(); updateMeta();
   }
 
   /* ---------- filtering ---------- */
-  function filtered() {
-    let out = db.channels;
-    if (country !== 'all') out = out.filter(c => c.country === country);
-    // WORKING gates the A–Z view strictly; CATEGORY shows all but orders verified first
-    if (workingOnly && sortMode === 'az')
-      out = out.filter(c => hasStream(c.id) && getStatus(c.id) === 'working');
-    if (sortMode !== 'az')
-      return [...out].sort((a, b) => {
-        const wa = getStatus(a.id) === 'working' ? 0 : 1;
-        const wb = getStatus(b.id) === 'working' ? 0 : 1;
-        return (wa - wb) || a.name.localeCompare(b.name);
-      });
-    return [...out].sort((a, b) =>
-      ((hasStream(b.id) ? 0 : 1) - (hasStream(a.id) ? 0 : 1)) || a.name.localeCompare(b.name));
-  }
+  /* moved to assets/prism-guide.js (filterChannels + controller) */
 
-  /* ---------- drawer renders ---------- */
-  const GUIDE_ROW_ORDER = ['sports', 'news', 'movies', 'kids', 'music', 'entertainment', 'documentary', 'series', 'general'];
+/* guide state/filter/render lives in assets/prism-guide.js (GUIDE-UX-A1);
+   prism.js keeps only the integration seam below. */
 
-  function renderCategoryRows(container) {
-    container.replaceChildren();
-    const byCat = new Map();
-    for (const c of filtered()) {
-      const cats = (c.categories || []).map(x => x.toLowerCase()).filter(Boolean);
-      for (const k of (cats.length ? cats.slice(0, 2) : ['general'])) {
-        if (!byCat.has(k)) byCat.set(k, []);
-        byCat.get(k).push(c);
-      }
-    }
-    const entries = [...byCat.entries()].sort((a, b) => {
-      const ia = GUIDE_ROW_ORDER.indexOf(a[0]), ib = GUIDE_ROW_ORDER.indexOf(b[0]);
-      return ((ia >= 0 ? ia : 99) - (ib >= 0 ? ib : 99)) || (b[1].length - a[1].length) || a[0].localeCompare(b[0]);
-    });
-    for (const [cat, chans] of entries) {
-      const row = el('div', 'guide-row');
-      row.appendChild(el('div', 'guide-row-title',
-        `${esc(cat.toUpperCase())} <span class="count">${chans.length.toLocaleString()}</span>`));
-      const strip = el('div', 'guide-cards');
-      chans.slice(0, 24).forEach(ch => strip.appendChild(gcard(ch, playFocused)));
-      row.appendChild(strip);
-      container.appendChild(row);
-    }
-    if (!container.children.length)
-      container.appendChild(el('div', 'tree-empty', 'Nothing matches these filters.'));
-  }
-
-  function channelRow(ch) {
-    const st = getStatus(ch.id);
-    const stream = hasStream(ch.id);
-    const b = el('button', 'ch-row' + (stream ? '' : ' nostream'));
-    b.dataset.id = ch.id;
-    const logo = logoFor(ch.id);
-    const flag = !logo ? flagFor(ch.country) : '';
-    b.innerHTML = `
-      <span class="dot ${st}${stream ? '' : ' none'}"></span>
-      ${logo ? `<img class="ch-logo" loading="lazy" src="${esc(logo)}" alt="">`
-             : flag ? `<img class="ch-flag" loading="lazy" src="${flag}" alt="">` : ''}
-      <span class="ch-name">${esc(ch.name)}</span>
-      ${ch.country ? `<span class="ch-cc">${esc(ch.country.toUpperCase())}</span>` : ''}
-      <span class="ch-actions">
-        <button class="row-new" title="Open in NEW player">＋</button>
-        <button class="fav-star${favs.has(ch.id) ? ' on' : ''}" title="Favorite">★</button>
-      </span>`;
-    b.addEventListener('click', e => {
-      if (e.target.closest('.fav-star')) { toggleFav(ch.id); return; }
-      if (e.target.closest('.row-new')) { playNewWindow(ch); return; }
-      if (!stream) { toast(`NO STREAM FOR ${ch.name.toUpperCase().slice(0, 26)}`); return; }
-      playFocused(ch);
-    });
-    return b;
-  }
-
-  function renderAzList(container) {
-    container.replaceChildren();
-    const list = filtered();
-    if (!list.length) {
-      container.appendChild(el('div', 'tree-empty',
-        workingOnly ? 'No verified-working matches. Untick WORKING.' : 'Nothing matches.'));
-      return;
-    }
-    const frag = document.createDocumentFragment();
-    for (const c of list) frag.appendChild(channelRow(c));
-    container.appendChild(frag);
-  }
-
-  function rerenderDrawer() {
-    if (sortMode === 'category') { azWrap.style.display = 'none'; catWrap.style.display = ''; renderCategoryRows(catWrap); }
-    else { catWrap.style.display = 'none'; azWrap.style.display = ''; renderAzList(azWrap); }
-    updateMeta();
-  }
-
-  /* drawer bindings */
-  $('workChk').addEventListener('change', e => { workingOnly = e.target.checked; rerenderDrawer(); });
-  $('sortSel').addEventListener('change', e => { sortMode = e.target.value; rerenderDrawer(); });
-  $('countrySel').addEventListener('change', e => { country = e.target.value; rerenderDrawer(); });
-
-  function playFocused(ch) {
-    const url = pickStream(ch.id);
-    if (!url) return;
+  function rerenderDrawer() { guide.rerender(); updateMeta(); }
+  function playUrlFocused(payload) {
+    if (!payload?.url) return;
     let w = focused();
-    if (!w || w.isEmpty) { if (!w) w = addWindow(); }
-    if (w.isEmpty && w.fill) w.fill(url, ch.name);
-    else { w.load(url); w.setTitle(ch.name.slice(0, 30)); }
-    setLast(rawOf(url), ch.name);
-    setDrawer(false);
+    if (!w) w = addWindow();
+    if (w.isEmpty && w.fill) w.fill(payload.url, payload.name);
+    else { w.load(payload.url); w.setTitle((payload.name || '').slice(0, 30)); }
+    setLast(rawOf(payload.url), payload.name || '');
   }
-  function playNewWindow(ch) {
-    const url = pickStream(ch.id);
-    if (!url) return;
+  function playUrlNewWindow(payload) {
+    if (!payload?.url) return;
     const w = addWindow();
-    w.load(url);
-    w.setTitle(ch.name.slice(0, 30));
-    setLast(rawOf(url), ch.name);
+    w.load(payload.url);
+    w.setTitle((payload.name || '').slice(0, 30));
+    setLast(rawOf(payload.url), payload.name || '');
   }
 
   /* ---------- drawer open/close (fixed-height, compact) ---------- */
@@ -548,7 +455,7 @@ export function mountPrism({ target, title = 'prism | α', defaultSource = DEFAU
     $('drawerCaret').querySelector('i').className =
       `fas fa-chevron-${open ? 'down' : 'up'}`;
     document.body.classList.toggle('drawer-open', open);
-    if (open && !catWrap.children.length && !azWrap.children.length) rerenderDrawer();
+    if (open) guide.rerender();
   }
   $('drawerCaret').addEventListener('click', e => { e.stopPropagation(); setDrawer(!drawerOpen); });
   dockBar.addEventListener('click', e => {
@@ -588,9 +495,7 @@ export function mountPrism({ target, title = 'prism | α', defaultSource = DEFAU
       const s = await loadCatalog(m => {
         $('dockMeta').innerHTML = `${chipHTML(m || 'loading…')}`;
       });
-      $('countrySel').insertAdjacentHTML('beforeend',
-        countries().slice(0, 60)
-          .map(([code, n]) => `<option value="${code}">${code.toUpperCase()} (${n.toLocaleString()})</option>`).join(''));
+      guide.initCountries();
       rerenderDrawer();
       updateMeta();
       requestLogos(rerenderDrawer);
@@ -603,7 +508,6 @@ export function mountPrism({ target, title = 'prism | α', defaultSource = DEFAU
 
   return { app: main, addWindow, wins, rerenderDrawer, setDrawer, player() { return focused(); } };
 }
-
 
 /* ================= window factory + snap-lock drag ================= */
 let zTop = 500;
@@ -767,7 +671,6 @@ function bar_drag(api, bar, stage) {
     addEventListener('pointermove', move); addEventListener('pointerup', up);
   });
 }
-
 
 /* SOURCE popover for one window (smart placement) */
 export function createSourceMenu(win, anchorBtn) {

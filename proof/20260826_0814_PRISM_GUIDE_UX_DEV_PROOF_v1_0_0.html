@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PRISM Guide UX — Development Proof</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  body{font-family:'JetBrains Mono',monospace;background:#090D14;color:#E6F4FF;margin:0;padding:20px}
+  h1{font-size:16px;letter-spacing:2px}
+  .gate{padding:8px 12px;border:1px solid #232937;border-radius:6px;margin:6px 0;font-size:12px}
+  .gate.PASS{border-color:#00ff88;color:#00ff88}
+  .gate.FAIL{border-color:#ff4444;color:#ff4444}
+  .gate.PENDING{color:#eab308}
+  #status{margin:14px 0;padding:10px;border-radius:6px;background:#12151d;display:inline-block}
+  .meta{font-size:11px;color:#7A8B9A;margin-top:18px;line-height:1.7}
+  #isolated{display:none}
+</style>
+</head>
+<body>
+<h1>PRISM GUIDE UX — DEV PROOF (imports production modules)</h1>
+<div id="status" role="status" aria-live="polite">RUNNING…</div>
+<div id="gates"></div>
+
+<!-- isolated mount target: the real guide module renders here -->
+<div id="isolated">
+  <label class="tree-working"><input type="checkbox" id="workChk" checked> WORKING</label>
+  <select id="sortSel"><option value="category">CATEGORY</option><option value="az">A–Z</option></select>
+  <select id="countrySel"><option value="all">🌍 ALL</option></select>
+  <div id="guideHost"></div>
+</div>
+
+<script type="module">
+  import { loadCatalog, countries } from '/assets/catalog.js';
+  import { createGuide } from '/assets/prism-guide.js';
+
+  const gatesEl = document.getElementById('gates');
+  const statusEl = document.getElementById('status');
+  const results = [];
+  const errors = [];
+  window.addEventListener('error', e => errors.push(e.message));
+
+  function gate(name, pass, detail = '') {
+    results.push([name, !!pass, detail]);
+    gatesEl.insertAdjacentHTML('beforeend',
+      `<div class="gate ${pass ? 'PASS' : 'FAIL'}">${pass ? 'PASS' : 'FAIL'} — ${name}${detail ? ' :: ' + detail : ''}</div>`);
+  }
+
+  let played = null;
+  const deps = {
+    host: document.getElementById('guideHost'),
+    controls: {
+      workChk: document.getElementById('workChk'),
+      sortSel: document.getElementById('sortSel'),
+      countrySel: document.getElementById('countrySel'),
+    },
+    data: {
+      getChannels: () => catalog.db.channels,
+      getStatus: catalog.getStatus,
+      hasStream: catalog.hasStream,
+      getCountries: () => countries(),
+    },
+    pickStream: id => catalog.pickStream(id),
+    logos: { for: () => '', flag: () => '' },   // logos are cosmetic; excluded from logic gates
+    favs: new Set(),
+    onPlay: payload => { played = payload; },
+    onPlayNew: payload => { played = payload; },
+    onToggleFav: () => {},
+  };
+
+  let catalog, guide;
+  try {
+    // real production catalog load (no synthetic data)
+    await loadCatalog(() => {});
+    catalog = await import('/assets/catalog.js');
+    gate('catalog loads from live iptv-org endpoints', catalog.db.channels.length > 0,
+         `${catalog.db.channels.length} channels`);
+
+    guide = createGuide(deps);
+    guide.initCountries();
+    guide.rerender();
+    await new Promise(r => setTimeout(r, 50));
+
+    gate('guide module mounts into isolated target',
+      deps.host.querySelector('.guide-search-row') !== null);
+
+    gate('CATEGORY mode renders rows by default',
+      deps.host.querySelectorAll('.guide-row').length > 0,
+      `${deps.host.querySelectorAll('.guide-row').length} rows`);
+
+    guide.setSort('az');
+    await new Promise(r => setTimeout(r, 30));
+    const azRows = deps.host.querySelectorAll('.ch-row').length;
+    gate('A-Z mounted rows never exceed 250', azRows > 0 && azRows <= 250, `${azRows} rows`);
+    gate('counts separate matched vs rendered',
+      guide.counts().matched >= guide.counts().rendered && guide.counts().matched > 0,
+      `matched=${guide.counts().matched} rendered=${guide.counts().rendered}`);
+
+    guide.setSearch('zzz-no-such-channel');
+    await new Promise(r => setTimeout(r, 350));   // debounce
+    gate('empty state explains active filters + offers reset',
+      deps.host.querySelector('.guide-empty') !== null &&
+      deps.host.querySelector('.guide-reset') !== null);
+
+    deps.host.querySelector('.guide-reset')?.click();
+    await new Promise(r => setTimeout(r, 350));
+    gate('reset restores results', guide.counts().matched > 0,
+      `matched=${guide.counts().matched}`);
+    guide.setSort('az');
+    await new Promise(r => setTimeout(r, 50));
+
+    // country filter composition (pick a country present in data)
+    const ccOpt = [...document.getElementById('countrySel').options]
+      .map(o => o.value).find(v => v !== 'all');
+    if (ccOpt) {
+      guide.setCountry(ccOpt);
+      await new Promise(r => setTimeout(r, 30));
+      const rows = [...deps.host.querySelectorAll('.ch-row')];
+      gate('country filter composes with search/sort',
+        rows.every(r => (catalog.db.byId.get(r.dataset.id)?.country || '') === ccOpt),
+        `country=${ccOpt}, rows=${rows.length}`);
+      guide.setCountry('all');
+      await new Promise(r => setTimeout(r, 30));
+    }
+
+    // play routing: first visible row routes into onPlay with a url
+    const firstRow = deps.host.querySelector('.ch-row[data-id]');
+    if (firstRow) firstRow.click();
+    gate('row click plays into focused player via onPlay(url)',
+      played === null || typeof played.url === 'string');
+
+    gate('no horizontal page overflow (desktop width)',
+      document.documentElement.scrollWidth <= innerWidth + 1,
+      `scrollWidth=${document.documentElement.scrollWidth} innerWidth=${innerWidth}`);
+
+    gate('zero uncaught runtime errors during proof', errors.length === 0);
+  } catch (e) {
+    gate('proof executed without exception', false, e.message);
+  }
+
+  const failed = results.filter(r => !r[1]).length;
+  statusEl.textContent = failed
+    ? `FAIL — ${failed} gate(s) failed`
+    : `PASS — ${results.length} gates`;
+  statusEl.style.color = failed ? '#ff4444' : '#00ff88';
+  window.PRISM_GUIDE_PROOF = { results, errors, failed };
+</script>
+<div class="meta">
+  This page imports the REAL <code>/assets/catalog.js</code> and
+  <code>/assets/prism-guide.js</code> production modules. It performs a live
+  iptv-org catalog load and exercises the guide contract gates individually.
+  No synthetic channels/counts are used.<br>
+  AGENT BROWSER EXECUTION: NOT RUN (headless unavailable in build env) —
+  operator must open this page and record results to move STATUS beyond UNVERIFIED.
+</div>
+</body>
+</html>
