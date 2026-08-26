@@ -262,8 +262,13 @@ select { color-scheme: dark; }
 }
 
 /* ---------- country dropdown ---------- */
+/* Fixed, not absolute. The menu is appended to <body> because .pill-bar is
+   `overflow-x: auto`, which clips any overflowing child on BOTH axes — an
+   absolutely-positioned menu at top:100% was clipped away and never rendered.
+   Coordinates are written inline by openCountryDropdown() from the button's
+   own getBoundingClientRect(). */
 .country-dropdown {
-  position: absolute; top: 100%; left: 0; min-width: 160px;
+  position: fixed; min-width: 160px; max-height: 320px; overflow-y: auto;
   background: var(--bg-dark); border: 1px solid var(--border-color);
   border-radius: 4px; padding: 6px 0; z-index: 100;
   box-shadow: 0 4px 12px rgba(0,0,0,.3); display: none;
@@ -275,3 +280,15 @@ select { color-scheme: dark; }
 }
 .country-dropdown-item:hover { background: var(--hover); }
 .country-dropdown-item:active { background: var(--active); }
+
+/* WORKING stacked over ONLY. Wrapping could not do this — .cat-pill sets
+   min-height:36px (which beats an inline height) and nothing constrained the
+   button's width, so the text never had a reason to wrap. Two explicit spans
+   in a column flex container stack regardless of width or font size. */
+.cat-pill.pill-stack {
+  display: inline-flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  line-height: 1.02; font-size: 9px; letter-spacing: .6px;
+  padding: 0 12px; gap: 1px;
+}
+.cat-pill.pill-stack > span { display: block; white-space: nowrap; }

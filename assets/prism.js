@@ -225,18 +225,61 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
   }
   section.querySelector('#secHeader').addEventListener('click', () => setOpen(!open));
 
+  /* ---------- country dropdown: opened as a fixed-position overlay ----------
+     Kept outside renderPills() so exactly ONE of each listener exists for the
+     lifetime of the page, and so the open menu survives a re-render.        */
+  let openDropdown = null;
+
+  function closeCountryDropdown() {
+    if (!openDropdown) return;
+    openDropdown.classList.remove('open');
+    openDropdown = null;
+  }
+
+  function openCountryDropdown(btn, menu) {
+    const r = btn.getBoundingClientRect();
+    // position:fixed is viewport-relative, so the rect needs no scroll offset.
+    menu.style.top = `${Math.round(r.bottom + 6)}px`;
+    menu.style.left = `${Math.round(r.left)}px`;
+    menu.classList.add('open');
+    openDropdown = menu;
+    // Clamp back inside the viewport if opening near the right edge.
+    const m = menu.getBoundingClientRect();
+    if (m.right > window.innerWidth - 8) {
+      menu.style.left = `${Math.round(window.innerWidth - m.width - 8)}px`;
+    }
+  }
+
+  // Registered once. Capture phase so it still fires when a child stops
+  // propagation, and it must not fight the button's own toggle.
+  document.addEventListener('click', (e) => {
+    if (!openDropdown) return;
+    if (openDropdown.contains(e.target)) return;
+    if (e.target.closest?.('.pill-country')) return;
+    closeCountryDropdown();
+  });
+  // A fixed menu does not follow its anchor, so dismiss on scroll/resize
+  // rather than leave it stranded mid-page.
+  window.addEventListener('scroll', closeCountryDropdown, true);
+  window.addEventListener('resize', closeCountryDropdown);
+
   /* ---------- unified pill bar: working toggle + countries + categories ---------- */
   function renderPills() {
     pillBar.replaceChildren();
 
-    // WORKING STREAMS toggle — compact single line, text wraps
+    // WORKING toggle — WORKING stacked ON TOP OF ONLY.
+    //
+    // Wrapping cannot do this. Earlier attempts set white-space:normal plus
+    // height:18px and neither took effect:
+    //   * .cat-pill declares min-height:36px, and min-height ALWAYS beats
+    //     height, so the button stayed 36px tall;
+    //   * nothing constrained the width, and a flex item with flex-shrink:0
+    //     sizes to its content, so the text had no reason to wrap.
+    // Two explicit lines in a column flex container stack regardless of width,
+    // font size, or what the shared .cat-pill rule does.
     const workPill = el('button',
-      'cat-pill pill-work' + (workingOnly ? ' on' : ''),
-      'WORKING ONLY');
-    workPill.style.whiteSpace = 'normal';
-    workPill.style.fontSize = '9px';
-    workPill.style.padding = '1px 0';
-    workPill.style.height = '18px';
+      'cat-pill pill-work pill-stack' + (workingOnly ? ' on' : ''),
+      '<span>WORKING</span><span>ONLY</span>');
     workPill.addEventListener('click', () => {
       workingOnly = !workingOnly;
       renderPills(); rerenderList();
@@ -260,31 +303,45 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
     countryBtn.style.fontSize = '10px';
     countryBtn.style.lineHeight = '1.2';
     countryBtn.style.width = 'auto';
-    countryBtn.style.position = 'relative';
     countryBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      dropdown.classList.toggle('open');
+      const opening = !dropdown.classList.contains('open');
+      closeCountryDropdown();
+      if (opening) openCountryDropdown(countryBtn, dropdown);
     });
     pillBar.appendChild(countryBtn);
+
+    // THE DROPDOWN MUST NOT LIVE INSIDE .pill-bar.
+    //
+    // .pill-bar is `overflow-x: auto`, which establishes a clipping context —
+    // and per spec, when one axis is `auto` the other computes to `auto` too,
+    // so vertical overflow is clipped as well. A child at `top: 100%` renders
+    // outside the content box and is clipped away entirely; it never appeared.
+    // Adding `position: relative` to the scroll container made it worse, since
+    // the menu then scrolled horizontally with the pills.
+    //
+    // Appending to <body> with position:fixed escapes every overflow, scroll
+    // and transform ancestor. Coordinates come from the button's own rect at
+    // open time, so it tracks the pill wherever the bar happens to be scrolled.
+    closeCountryDropdown();
+    document.querySelectorAll('body > .country-dropdown').forEach(n => n.remove());
     const dropdown = el('div', 'country-dropdown');
-    pillBar.style.position = 'relative';
+    document.body.appendChild(dropdown);
     // ALL option
     const allOpt = el('div', 'country-dropdown-item',
       `🌍 ALL (${ALL.length})`);
-    allOpt.addEventListener('click', () => { country = 'all'; renderPills(); rerenderList(); dropdown.classList.remove('open'); });
+    allOpt.addEventListener('click', () => { closeCountryDropdown(); country = 'all'; renderPills(); rerenderList(); });
     dropdown.appendChild(allOpt);
     // top countries
     for (const [code, n] of topCC) {
       const opt = el('div', 'country-dropdown-item',
         `${code.toUpperCase()} (${n})`);
-      opt.addEventListener('click', () => { country = code; renderPills(); rerenderList(); dropdown.classList.remove('open'); });
+      opt.addEventListener('click', () => { closeCountryDropdown(); country = code; renderPills(); rerenderList(); });
       dropdown.appendChild(opt);
     }
-    // click outside to close
-    document.addEventListener('click', (e) => {
-      if (!countryBtn.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('open');
-    });
-    pillBar.appendChild(dropdown);
+    // Click-outside is registered ONCE at module level (see closeCountryDropdown
+    // below), not here. renderPills() runs from eight call sites, so a listener
+    // added here accumulated one stale closure per filter change.
 
     // separator
     pillBar.appendChild(el('span', 'pill-sep'));
