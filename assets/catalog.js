@@ -191,7 +191,7 @@ export function hierarchy(channels) {
 }
 
 /* main loader: onProgress(stage string) fires as it goes */
-export async function loadCatalog(onProgress = () => {}) {
+export async function loadCatalog(onProgress = () => {}, onStatus = () => {}) {
   onProgress('fetching channel index…');
   const [channelsData, streamsData] = await Promise.all([
     cachedJson('channels', `${API}/channels.json`),
@@ -214,21 +214,25 @@ export async function loadCatalog(onProgress = () => {}) {
   }
 
   onProgress('loading verified-working map…');
-  /* global probe results: cron shortlist + every device's reported statuses.
-     NOTE: the worker only echoes ACAO for allowlisted pages.dev origins —
-     if both maps come back empty, suspect CORS before suspecting data. */
-  const jobs = [
-    fetch(`${PROXY}/shortlist`).then(r => r.ok ? r.json() : null).catch(e => { console.warn('[catalog] /shortlist blocked:', e.message); return null; }),
-    fetch(`${PROXY}/api/status`).then(r => r.ok ? r.json() : null).catch(e => { console.warn('[catalog] /api/status blocked:', e.message); return null; }),
-  ];
-  const [shortlist, legacyStatus] = await Promise.all(jobs);
-  if (shortlist?.channels) {
-    for (const c of shortlist.channels) {
-      if (c.id && c.checked) db.status.set(c.id, { status: 'working', time: c.checked });
+  /* global probe results: fetched in background so they never block boot.
+     The list renders immediately from channels+streams; statuses merge
+     when they arrive and onStatus() fires for UI refresh. */
+  fetch(`${PROXY}/shortlist`).then(r => r.ok ? r.json() : null).then(j => {
+    if (!j?.channels) return;
+    const now = Date.now();
+    for (const c of j.channels) {
+      if (c.id && c.checked) {
+        const prev = db.status.get(c.id);
+        if (!prev || (prev.time || 0) < c.checked)
+          db.status.set(c.id, { status: 'working', time: c.checked });
+      }
     }
-  }
-  mergeStatusMap(legacyStatus);
-  if (!db.status.size) console.warn('[catalog] ZERO statuses loaded — CORS allowlist or empty KV');
+    onStatus();
+  }).catch(e => { console.warn('[catalog] /shortlist:', e.message); });
+  fetch(`${PROXY}/api/status`).then(r => r.ok ? r.json() : null).then(j => {
+    mergeStatusMap(j);
+    onStatus();
+  }).catch(e => { console.warn('[catalog] /api/status:', e.message); });
 
   onProgress('ranking…');
   const out = [];

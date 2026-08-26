@@ -492,9 +492,10 @@ export function mountPrism({ target, title = 'prism | α', defaultSource = DEFAU
 
   (async () => {
     try {
-      const s = await loadCatalog(m => {
-        $('dockMeta').innerHTML = `${chipHTML(m || 'loading…')}`;
-      });
+      const s = await loadCatalog(
+        m => { $('dockMeta').innerHTML = `${chipHTML(m || 'loading.')}`; },
+        () => { rerenderDrawer(); updateMeta(); },
+      );
       guide.initCountries();
       rerenderDrawer();
       updateMeta();
