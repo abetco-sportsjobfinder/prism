@@ -609,6 +609,9 @@ export function mountPrism({ target, title = 'prism | α', defaultSource = DEFAU
 let zTop = 500;
 
 export function createWindow({ stage, title = 'LIVE', idle = false }) {
+  if (!stage || typeof stage.appendChild !== 'function') {
+    throw new TypeError('createWindow requires a valid stage element');
+  }
   const cell = el('section', 'pwin');
   cell.innerHTML = `
     <div class="pwin-bar">
@@ -619,6 +622,7 @@ export function createWindow({ stage, title = 'LIVE', idle = false }) {
       </span>
     </div>
     <video controls playsinline preload="metadata"></video>
+    <div class="pwin-loading">${chipHTML('LOADING')}</div>
     <div class="pwin-idle">${chipHTML('')}<span>PICK A CHANNEL BELOW</span></div>
     <div class="player-err"></div>`;
   stage.appendChild(cell);
@@ -714,7 +718,7 @@ export function createWindow({ stage, title = 'LIVE', idle = false }) {
 }
 
 /* spawn alias kept so mountPrism reads cleanly */
-const spawnWindow = ({ stage }) => createWindow({ stage });
+const spawnWindow = stage => createWindow({ stage });
 
 const DRAG_THRESHOLD = 14;
 const SNAP_RETURN = 34;

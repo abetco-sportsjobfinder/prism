@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>PRISM Widget Dev Proof v1.0.0</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../assets/prism.css">
+  <style>
+    #proof-rail {
+      position: fixed; z-index: 100000; top: 8px; right: 8px; width: min(390px, calc(100vw - 16px));
+      padding: 10px 12px; border: 1px solid #23506a; border-radius: 8px;
+      background: rgba(4, 10, 16, .94); color: #d8e5ec; font: 12px/1.45 "JetBrains Mono", monospace;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .5); pointer-events: none;
+    }
+    #proof-rail strong { color: #fdb515; }
+    #proof-list { display: grid; gap: 3px; margin-top: 6px; }
+    .proof-pass { color: #61d095; }
+    .proof-fail { color: #ff6b6b; }
+    #proof-meta { margin-top: 6px; color: #8fa9b8; }
+    @media (max-width: 640px) {
+      #proof-rail { top: 4px; right: 4px; width: calc(100vw - 8px); font-size: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <aside id="proof-rail" data-proof-version="1.0.0">
+    <strong>PRISM WIDGET DEV PROOF · v1.0.0</strong>
+    <div id="proof-list">Running real browser gates...</div>
+    <div id="proof-meta">Production is not modified by this page.</div>
+  </aside>
+  <main id="proof-mount"></main>
+  <script type="module">
+    const runtimeErrors = [];
+    addEventListener('error', event => runtimeErrors.push(event.error?.stack || event.message));
+    addEventListener('unhandledrejection', event => runtimeErrors.push(String(event.reason)));
+
+    const started = performance.now();
+    const mount = document.getElementById('proof-mount');
+    const list = document.getElementById('proof-list');
+    const meta = document.getElementById('proof-meta');
+
+    function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+    async function waitFor(predicate, timeoutMs = 15000) {
+      const deadline = performance.now() + timeoutMs;
+      while (performance.now() < deadline) {
+        if (predicate()) return true;
+        await wait(100);
+      }
+      return false;
+    }
+    function render(checks) {
+      list.innerHTML = checks.map(([name, ok, detail = '']) =>
+        `<div class="proof-${ok ? 'pass' : 'fail'}">${ok ? 'PASS' : 'FAIL'} · ${name}${detail ? ` · ${detail}` : ''}</div>`
+      ).join('');
+    }
+
+    try {
+      const mod = await import('../assets/prism.js');
+      const api = mod.mountPrism({ target: mount });
+      await wait(400);
+      const catalogSettled = await waitFor(() => {
+        const value = document.getElementById('dockMeta')?.textContent || '';
+        return /\d/.test(value) && !value.includes('LOADING');
+      });
+      api.setDrawer(true);
+      await wait(100);
+
+      const checks = [
+        ['module mounted', Boolean(api?.app)],
+        ['stage exists', Boolean(document.querySelector('.stage-area'))],
+        ['initial player exists', Boolean(document.querySelector('.pwin video'))],
+        ['loading overlay exists', Boolean(document.querySelector('.pwin-loading'))],
+        ['category is default', document.getElementById('sortSel')?.value === 'category'],
+        ['country control exists', Boolean(document.getElementById('countrySel'))],
+        ['working control exists', Boolean(document.getElementById('workChk'))],
+        ['catalog settled', catalogSettled, document.getElementById('dockMeta')?.textContent.trim()],
+        ['countries discovered', document.getElementById('countrySel')?.options.length > 1],
+        ['category rows rendered', document.querySelectorAll('.guide-row').length > 0],
+        ['no horizontal overflow', document.documentElement.scrollWidth <= document.documentElement.clientWidth],
+        ['no boot exception', runtimeErrors.length === 0, runtimeErrors[0] || 'clean'],
+      ];
+      render(checks);
+      meta.textContent = `${checks.filter(([, ok]) => ok).length}/${checks.length} gates · boot ${Math.round(performance.now() - started)} ms · catalog continues asynchronously`;
+      document.documentElement.dataset.proofVerdict = checks.every(([, ok]) => ok) ? 'PASS' : 'FAIL';
+    } catch (error) {
+      runtimeErrors.push(error.stack || String(error));
+      render([['module mounted', false, error.message]]);
+      meta.textContent = 'FAIL · see browser console';
+      document.documentElement.dataset.proofVerdict = 'FAIL';
+      console.error('[PRISM DEV PROOF]', error);
+    }
+  </script>
+</body>
+</html>
