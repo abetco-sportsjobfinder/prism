@@ -229,13 +229,14 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
   function renderPills() {
     pillBar.replaceChildren();
 
-    // WORKING STREAMS toggle — compact single line
+    // WORKING STREAMS toggle — compact single line, text wraps
     const workPill = el('button',
       'cat-pill pill-work' + (workingOnly ? ' on' : ''),
       'WORKING ONLY');
     workPill.style.whiteSpace = 'normal';
     workPill.style.fontSize = '9px';
     workPill.style.padding = '1px 0';
+    workPill.style.maxWidth = '40px';
     workPill.addEventListener('click', () => {
       workingOnly = !workingOnly;
       renderPills(); rerenderList();
@@ -259,6 +260,7 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
     countryBtn.style.fontSize = '10px';
     countryBtn.style.lineHeight = '1.2';
     countryBtn.style.width = 'auto';
+    countryBtn.style.position = 'relative';
     countryBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       dropdown.classList.toggle('open');
