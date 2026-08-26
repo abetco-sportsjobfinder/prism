@@ -1,0 +1,45 @@
+{
+  "receipt_version": "1.0.0",
+  "recorded_at_utc": "2026-08-26T05:20:42Z",
+  "scope": "prism_widget_production_promotion",
+  "environment": "production",
+  "production_url": "https://prism-tv.pages.dev/",
+  "promoted_commit": "6a48924dafa6e1b03dd3d9b7781063b2795b09a0",
+  "previous_production_commit": "b5b5627084abba24e3fe41d80efb42f9f657976b",
+  "source_branch": "codex/prism-widget-recovery-20260825-133200",
+  "development_proof_url": "https://e6b2d418.prism-tv.pages.dev/proof/20260825_204000_PRISM_WIDGET_DEV_PROOF_v1_0_0.html",
+  "deployment_workflow_run": "https://github.com/abetco-sportsjobfinder/prism/actions/runs/32933511144",
+  "browser_observed": {
+    "initial_players": 1,
+    "channels_indexed": 40766,
+    "verified_working_channels": 3353,
+    "country_options": 61,
+    "category_rows": 30,
+    "category_cards_rendered": 701,
+    "sort_options": ["CATEGORY", "A-Z"],
+    "horizontal_overflow_px": 0,
+    "console_warnings_or_errors": 0
+  },
+  "country_filter_gate": {
+    "selected_country": "US",
+    "visible_rows": 759,
+    "first_rows_checked": 15,
+    "non_us_visible_rows": 0,
+    "passed": true
+  },
+  "verdicts": {
+    "player_boot": "PASS",
+    "channel_guide": "PASS",
+    "category_sort": "PASS",
+    "alphabetical_sort": "PASS",
+    "country_filter": "PASS",
+    "production_promotion": "PASS"
+  },
+  "attestations": {
+    "development_first": true,
+    "fast_forward_only": true,
+    "no_unrelated_files_overwritten": true,
+    "no_synthetic_channels": true,
+    "no_secrets_in_receipt": true
+  }
+}
