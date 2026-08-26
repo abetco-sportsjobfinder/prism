@@ -29,11 +29,14 @@ function loadScript(src) {
 }
 const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const chipHTML = '<span class="abet-chip-loader"><div class="abet-chip-perspective"><div class="abet-chip-spinner"><div class="abet-chip-face">' +
-  Array.from({length:8},(_,o)=>`<span class="abet-chip-seg" style="transform:rotate(${o*45}deg)"></span>`).join('') +
-  '<span class="abet-chip-txt">ABET</span></div><div class="abet-chip-face abet-chip-back">' +
-  Array.from({length:8},(_,o)=>`<span class="abet-chip-seg" style="transform:rotate(${o*45}deg)"></span>`).join('') +
-  '<span class="abet-chip-txt">ABET</span></div></div></div></div>';
+const CHIP_CSS = `.abet-chip-perspective{perspective:620px;width:56px;height:56px}.abet-chip-spinner{width:100%;height:100%;position:relative;transform-style:preserve-3d;animation:abet-chip-flip 2.4s cubic-bezier(.45,.05,.35,1) infinite}.abet-chip-face{position:absolute;inset:0;border-radius:50%;background:#0b0f17;display:flex;align-items:center;justify-content:center;backface-visibility:hidden}.abet-chip-seg{position:absolute;left:50%;top:4px;width:9px;height:15px;margin-left:-4.5px;border-radius:3px;background:rgba(253,181,21,0.85)}.abet-chip-txt{font-family:Georgia,'Times New Roman',serif;font-size:13px;letter-spacing:1px;color:#FDB515;text-shadow:0 0 8px rgba(253,181,21,.65)}.abet-chip-back{transform:rotateY(180deg)}@keyframes abet-chip-flip{0%{transform:rotateY(0deg) translateY(0)}45%{transform:rotateY(540deg) translateY(-10px)}70%{transform:rotateY(720deg) translateY(0)}78%{transform:rotateY(720deg) translateY(-4px)}100%{transform:rotateY(1080deg) translateY(0)}}`;
+let _chipCssDone = false;
+const chipHTML = () => {
+  const css = _chipCssDone ? '' : `<style>${CHIP_CSS}</style>`;
+  _chipCssDone = true;
+  const segs = Array.from({length:8},(_,o)=>`<span class="abet-chip-seg" style="transform:rotate(${o*45}deg)"></span>`).join('');
+  return `${css}<div class="abet-chip-loader" role="status" aria-live="polite"><div class="abet-chip-perspective"><div class="abet-chip-spinner"><div class="abet-chip-face">${segs}<span class="abet-chip-txt">ABET</span></div><div class="abet-chip-face abet-chip-back">${segs}<span class="abet-chip-txt">ABET</span></div></div></div></div>`;
+};
 const proxied = url => `${PROXY}?u=${encodeURIComponent(url)}`;
 function rawOf(u) {
   try {
