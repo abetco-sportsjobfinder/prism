@@ -81,7 +81,7 @@ export function createPlayer({ stage }) {
   const shell = el('div', 'player-shell');
   shell.innerHTML = `
     <video controls playsinline preload="metadata"></video>
-    <div class="player-loading">${chipHTML}</div>
+    <div class="player-loading">${chipHTML()}</div>
     <div class="player-err"></div>`;
   stage.appendChild(shell);
 
@@ -356,20 +356,11 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
     try {
       await loadCatalog(m => {
         countEl.textContent = m || 'loading…';
-        chList.replaceChildren(el('div', 'list-boot', `${chipHTML}<div>${esc(m || 'loading…')}</div>`));
+        chList.replaceChildren(el('div', 'list-boot', `${chipHTML()}<div>${esc(m || 'loading…')}</div></div>`));
       });
       ALL = [...db.channels].sort((a, b) =>
         ((hasStream(b.id) ? 0 : 1) - (hasStream(a.id) ? 0 : 1)) ||
         (a.rank - b.rank) || a.name.localeCompare(b.name));
-      // populate country filter
-      const cc = new Map();
-      for (const c of ALL) {
-        if (c.country?.length === 2) cc.set(c.country, (cc.get(c.country) || 0) + 1);
-      }
-      for (const [code, n] of [...cc.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60)) {
-        countrySel.insertAdjacentHTML('beforeend',
-          `<option value="${esc(code)}">${esc(code.toUpperCase())} (${n.toLocaleString()})</option>`);
-      }
       renderPills();
       rerenderList();
       requestLogos(() => refreshLogos());
