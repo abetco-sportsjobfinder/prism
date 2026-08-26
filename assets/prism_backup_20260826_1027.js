@@ -190,6 +190,10 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
     </button>
     <div class="collapse-body" id="collapseBody">
       <div class="pill-bar" id="pillBar"></div>
+      <div class="filter-bar">
+        <label class="f-work"><input type="checkbox" id="workChk" /> WORKING</label>
+        <select id="countrySel" class="f-country"><option value="all">🌍 ALL</option></select>
+      </div>
       <div class="ch-list" id="chList"></div>
       <div class="list-more-wrap"><button class="list-more" id="listMore">SHOW MORE</button></div>
     </div>`;
@@ -207,10 +211,15 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
   let ALL = [];
   let CUR = [];
   let rendered = 0;
+  let expanded = true;
   let activeCat = 'all';
   let workingOnly = false;
   let country = 'all';
   let open = false;
+
+  /* ---------- refs for filters ---------- */
+  const workChk = section.querySelector('#workChk');
+  const countrySel = section.querySelector('#countrySel');
 
   /* ---------- collapse toggle ---------- */
   function setOpen(v) {
@@ -222,58 +231,27 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
   }
   section.querySelector('#secHeader').addEventListener('click', () => setOpen(!open));
 
-  /* ---------- unified pill bar: working toggle + countries + categories ---------- */
-  function renderPills() {
+  workChk.addEventListener('change', () => { workingOnly = workChk.checked; rerenderList(); });
+  countrySel.addEventListener('change', () => { country = countrySel.value; rerenderList(); });
+
+  /* ---------- category pills ---------- */
+  const CAT_ORDER = ['all', 'sports', 'news', 'movies', 'kids', 'music', 'entertainment', 'documentary', 'series', 'general'];
+  function renderPills(cats) {
     pillBar.replaceChildren();
-
-    // WORKING STREAMS toggle
-    const workPill = el('button',
-      'cat-pill pill-work' + (workingOnly ? ' on' : ''),
-      '◉ WORKING STREAMS');
-    workPill.addEventListener('click', () => {
-      workingOnly = !workingOnly;
-      renderPills(); rerenderList();
-    });
-    pillBar.appendChild(workPill);
-
-    // separator
-    pillBar.appendChild(el('span', 'pill-sep'));
-
-    // top countries (by channel count)
-    const cc = new Map();
-    for (const c of ALL) {
-      if (c.country?.length === 2) cc.set(c.country, (cc.get(c.country) || 0) + 1);
+    // always start with ALL
+    addPill(pillBar, 'all', 'ALL', cats.includes('all'));
+    // then known categories in order
+    for (const cat of CAT_ORDER.slice(1)) {
+      if (cats.includes(cat)) addPill(pillBar, cat, cat.toUpperCase(), activeCat === cat);
     }
-    const topCC = [...cc.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15);
-    // ALL countries pill
-    addPill(pillBar, country === 'all', '🌍 ALL', country === 'all', () => { country = 'all'; renderPills(); rerenderList(); });
-    for (const [code, n] of topCC) {
-      addPill(pillBar, code, `${code.toUpperCase()} ${n.toLocaleString()}`, country === code,
-        () => { country = country === code ? 'all' : code; renderPills(); rerenderList(); });
-    }
-
-    // separator
-    pillBar.appendChild(el('span', 'pill-sep'));
-
-    // categories
-    const cats = getActiveCats();
-    addPill(pillBar, 'all-cat', 'ALL CATS', activeCat === 'all', () => { activeCat = 'all'; renderPills(); rerenderList(); });
-    const CAT_ORDER = ['sports', 'news', 'movies', 'kids', 'music', 'entertainment', 'documentary', 'series', 'general'];
-    for (const cat of CAT_ORDER) {
-      if (!cats.includes(cat)) continue;
-      addPill(pillBar, cat, cat.toUpperCase(), activeCat === cat,
-        () => { activeCat = activeCat === cat ? 'all' : cat; renderPills(); rerenderList(); });
-    }
+    // any remaining categories not in the priority list
     for (const cat of cats) {
-      if (CAT_ORDER.includes(cat)) continue;
-      addPill(pillBar, cat, cat.toUpperCase(), activeCat === cat,
-        () => { activeCat = activeCat === cat ? 'all' : cat; renderPills(); rerenderList(); });
+      if (cat !== 'all' && !CAT_ORDER.includes(cat)) addPill(pillBar, cat, cat.toUpperCase(), false);
     }
   }
-
-  function addPill(bar, _val, label, on, onClick) {
-    const b = el('button', 'cat-pill' + (on ? ' on' : ''), esc(label));
-    b.addEventListener('click', e => { e.stopPropagation(); onClick(); });
+  function addPill(bar, value, label) {
+    const b = el('button', 'cat-pill' + (activeCat === value ? ' on' : ''), esc(label));
+    b.addEventListener('click', () => { activeCat = value; renderPills(getActiveCats()); rerenderList(); });
     bar.appendChild(b);
   }
 
@@ -288,10 +266,10 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
   /* ---------- channel rendering ---------- */
   function currentList() {
     let out = ALL;
-    if (workingOnly) out = out.filter(c => hasStream(c.id) && getStatus(c.id) === 'working');
-    if (country !== 'all') out = out.filter(c => c.country === country);
     if (activeCat !== 'all')
       out = out.filter(c => (c.categories || []).map(x => x.toLowerCase()).includes(activeCat));
+    if (workingOnly) out = out.filter(c => hasStream(c.id) && getStatus(c.id) === 'working');
+    if (country !== 'all') out = out.filter(c => c.country === country);
     return out;
   }
 
@@ -301,12 +279,11 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
     const b = el('button', 'ch-row' + (stream ? '' : ' nostream'));
     b.dataset.id = ch.id;
     const logo = logoFor(ch.id);
-    const flag = flagFor(ch.country); // always show country flag
+    const flag = !logo ? flagFor(ch.country) : '';
     b.innerHTML = `
       <span class="dot ${st}${stream ? '' : ' none'}"></span>
       ${logo ? `<img class="ch-logo" loading="lazy" src="${esc(logo)}" alt="">`
-             : `<span class="ch-initial">${esc((ch.name || '?')[0].toUpperCase())}</span>`}
-      ${flag ? `<img class="ch-flag" loading="lazy" src="${esc(flag)}" alt="">` : ''}
+             : flag ? `<img class="ch-flag" loading="lazy" src="${flag}" alt="">` : ''}
       <span class="ch-name">${esc(ch.name)}</span>
       ${ch.country ? `<span class="ch-cc">${esc(ch.country.toUpperCase())}</span>` : ''}`;
     b.title = ch.name;
@@ -367,7 +344,7 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
         countrySel.insertAdjacentHTML('beforeend',
           `<option value="${esc(code)}">${esc(code.toUpperCase())} (${n.toLocaleString()})</option>`);
       }
-      renderPills();
+      renderPills(getActiveCats());
       rerenderList();
       requestLogos(() => refreshLogos());
       list.appendChild(sentinel);
