@@ -66,7 +66,7 @@ https://prism-dev-v1.prism-tv.pages.dev/proof/20260825_204000_PRISM_WIDGET_DEV_P
 Immutable deployment:
 
 ```text
-https://42561274.prism-tv.pages.dev
+https://e6b2d418.prism-tv.pages.dev
 ```
 
 Observed in a real browser on desktop and at a 390x844 phone viewport:
@@ -81,6 +81,12 @@ Observed in a real browser on desktop and at a 390x844 phone viewport:
 - Verified-working status: `WARN` because the existing status Worker CORS allowlist rejects the preview hostname; this is explicitly not certified by the boot receipt.
 
 Production `https://prism-tv.pages.dev/` remains unchanged at broken commit `b5b5627` during development review.
+
+Branch deployment workflow receipt:
+
+```text
+https://github.com/abetco-sportsjobfinder/prism/actions/runs/32917528173
+```
 
 ## Backup and rollback
 

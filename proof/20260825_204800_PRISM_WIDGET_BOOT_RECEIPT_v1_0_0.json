@@ -6,8 +6,9 @@
   "branch": "codex/prism-widget-recovery-20260825-133200",
   "source_commit_at_browser_verification": "548a6886cc52bfe2688d971c508c0485e12789e1",
   "preview_alias": "https://prism-dev-v1.prism-tv.pages.dev/",
-  "immutable_deployment": "https://42561274.prism-tv.pages.dev",
-  "proof_url": "https://prism-dev-v1.prism-tv.pages.dev/proof/20260825_204000_PRISM_WIDGET_DEV_PROOF_v1_0_0.html",
+  "immutable_deployment": "https://e6b2d418.prism-tv.pages.dev",
+  "proof_url": "https://e6b2d418.prism-tv.pages.dev/proof/20260825_204000_PRISM_WIDGET_DEV_PROOF_v1_0_0.html",
+  "deployment_workflow_run": "https://github.com/abetco-sportsjobfinder/prism/actions/runs/32917528173",
   "production_url": "https://prism-tv.pages.dev/",
   "production_modified": false,
   "gates": {
