@@ -49,6 +49,39 @@ http://127.0.0.1:4173/proof/20260825_204000_PRISM_WIDGET_DEV_PROOF_v1_0_0.html
 
 Promotion requires all twelve browser gates, zero console errors, desktop and mobile rendering, a branch-only hosted preview, and operator review. Production `main` must not be changed before those gates pass.
 
+## Hosted development verification
+
+Branch preview:
+
+```text
+https://prism-dev-v1.prism-tv.pages.dev/
+```
+
+Independent proof:
+
+```text
+https://prism-dev-v1.prism-tv.pages.dev/proof/20260825_204000_PRISM_WIDGET_DEV_PROOF_v1_0_0.html
+```
+
+Immutable deployment:
+
+```text
+https://42561274.prism-tv.pages.dev
+```
+
+Observed in a real browser on desktop and at a 390x844 phone viewport:
+
+- Boot contract: `12/12 PASS`
+- Runtime console errors: `0`
+- Indexed channels: `40,726`
+- Country options: `61`
+- Category rows: `30`
+- Horizontal overflow: `0 px`
+- Initial players: `1`
+- Verified-working status: `WARN` because the existing status Worker CORS allowlist rejects the preview hostname; this is explicitly not certified by the boot receipt.
+
+Production `https://prism-tv.pages.dev/` remains unchanged at broken commit `b5b5627` during development review.
+
 ## Backup and rollback
 
 Pre-change backup:

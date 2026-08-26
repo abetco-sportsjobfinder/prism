@@ -21,6 +21,7 @@ const checks = [
   ['proof waits for catalog completion', proof.includes('const catalogSettled = await waitFor')],
   ['proof checks rendered category rows', proof.includes("document.querySelectorAll('.guide-row')")],
   ['proof checks horizontal overflow', proof.includes('document.documentElement.scrollWidth <= document.documentElement.clientWidth')],
+  ['proof reports status-integration warning', proof.includes('data-integration-verdict') || proof.includes('dataset.integrationVerdict')],
   ['proof captures runtime errors', proof.includes("addEventListener('error'")],
 ];
 

@@ -1,0 +1,35 @@
+{
+  "receipt_version": "1.0.0",
+  "recorded_at_utc": "2026-08-25T20:48:00Z",
+  "scope": "prism_widget_boot_recovery",
+  "environment": "development_preview",
+  "branch": "codex/prism-widget-recovery-20260825-133200",
+  "source_commit_at_browser_verification": "548a6886cc52bfe2688d971c508c0485e12789e1",
+  "preview_alias": "https://prism-dev-v1.prism-tv.pages.dev/",
+  "immutable_deployment": "https://42561274.prism-tv.pages.dev",
+  "proof_url": "https://prism-dev-v1.prism-tv.pages.dev/proof/20260825_204000_PRISM_WIDGET_DEV_PROOF_v1_0_0.html",
+  "production_url": "https://prism-tv.pages.dev/",
+  "production_modified": false,
+  "gates": {
+    "source_contract": { "passed": 12, "failed": 0 },
+    "desktop_browser": { "passed": 12, "failed": 0, "console_errors": 0 },
+    "mobile_390x844": { "passed": 12, "failed": 0, "console_errors": 0, "horizontal_overflow_px": 0 }
+  },
+  "observed": {
+    "channels_indexed": 40726,
+    "country_options": 61,
+    "category_rows": 30,
+    "initial_players": 1,
+    "verified_working_channels": 0
+  },
+  "verdicts": {
+    "boot_recovery": "PASS",
+    "working_status_integration": "WARN_BLOCKED_BY_PREVIEW_ORIGIN_CORS",
+    "production_promotion": "NOT_REQUESTED_NOT_PERFORMED"
+  },
+  "attestations": {
+    "no_synthetic_channels": true,
+    "no_production_change": true,
+    "no_secrets_in_receipt": true
+  }
+}

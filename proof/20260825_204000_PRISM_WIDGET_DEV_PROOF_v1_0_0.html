@@ -20,6 +20,7 @@
     #proof-list { display: grid; gap: 3px; margin-top: 6px; }
     .proof-pass { color: #61d095; }
     .proof-fail { color: #ff6b6b; }
+    .proof-warn { color: #fdb515; }
     #proof-meta { margin-top: 6px; color: #8fa9b8; }
     @media (max-width: 640px) {
       #proof-rail { top: 4px; right: 4px; width: calc(100vw - 8px); font-size: 10px; }
@@ -84,8 +85,17 @@
         ['no boot exception', runtimeErrors.length === 0, runtimeErrors[0] || 'clean'],
       ];
       render(checks);
-      meta.textContent = `${checks.filter(([, ok]) => ok).length}/${checks.length} gates · boot ${Math.round(performance.now() - started)} ms · catalog continues asynchronously`;
+      const statusText = document.getElementById('dockMeta')?.textContent || '';
+      const verifiedText = statusText.match(/([\d,]+)\s*✓/)?.[1] || '0';
+      const verifiedCount = Number(verifiedText.replaceAll(',', ''));
+      const integrationStatus = verifiedCount > 0 ? 'PASS' : 'WARN';
+      if (!verifiedCount) {
+        list.insertAdjacentHTML('beforeend',
+          '<div class="proof-warn">WARN · verified-working status unavailable on preview origin (CORS)</div>');
+      }
+      meta.textContent = `${checks.filter(([, ok]) => ok).length}/${checks.length} boot gates · ${Math.round(performance.now() - started)} ms · status integration ${integrationStatus}`;
       document.documentElement.dataset.proofVerdict = checks.every(([, ok]) => ok) ? 'PASS' : 'FAIL';
+      document.documentElement.dataset.integrationVerdict = integrationStatus;
     } catch (error) {
       runtimeErrors.push(error.stack || String(error));
       render([['module mounted', false, error.message]]);
