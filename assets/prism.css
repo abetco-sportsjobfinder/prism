@@ -292,3 +292,15 @@ select { color-scheme: dark; }
   padding: 0 12px; gap: 1px;
 }
 .cat-pill.pill-stack > span { display: block; white-space: nowrap; }
+
+/* Country dropdown rows: flag, code, count on one baseline. The flag box keeps
+   a fixed width so the codes line up even when a flag fails to load and its
+   <img> removes itself. */
+.country-dropdown-item {
+  display: flex; align-items: center; gap: 8px;
+}
+.cd-flag { width: 20px; height: 14px; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
+.cd-globe { display: inline-flex; align-items: center; justify-content: center;
+            height: 14px; font-size: 12px; line-height: 1; }
+.cd-code { flex: 1; }
+.cd-n { color: var(--text-muted); font-size: 10px; flex-shrink: 0; }

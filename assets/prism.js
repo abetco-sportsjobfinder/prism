@@ -211,7 +211,9 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
   let CUR = [];
   let rendered = 0;
   let activeCat = 'all';
-  let workingOnly = false;
+  // Default ON: the page opens showing only channels with a verified working
+  // stream. The pill still toggles it off.
+  let workingOnly = true;
   let country = 'all';
   let open = false;
 
@@ -327,15 +329,22 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
     document.querySelectorAll('body > .country-dropdown').forEach(n => n.remove());
     const dropdown = el('div', 'country-dropdown');
     document.body.appendChild(dropdown);
-    // ALL option
+    // ALL option — globe stands in for the flag so the rows align
     const allOpt = el('div', 'country-dropdown-item',
-      `🌍 ALL (${ALL.length})`);
+      `<span class="cd-flag cd-globe">🌍</span>` +
+      `<span class="cd-code">ALL</span>` +
+      `<span class="cd-n">(${ALL.length})</span>`);
     allOpt.addEventListener('click', () => { closeCountryDropdown(); country = 'all'; renderPills(); rerenderList(); });
     dropdown.appendChild(allOpt);
-    // top countries
+    // top countries — flag alongside the code, same flagcdn source the channel
+    // rows already use. onerror strips a missing flag rather than leaving a
+    // broken-image glyph in the menu.
     for (const [code, n] of topCC) {
+      const f = flagFor(code);
       const opt = el('div', 'country-dropdown-item',
-        `${code.toUpperCase()} (${n})`);
+        `${f ? `<img class="cd-flag" src="${f}" alt="" loading="lazy" onerror="this.remove()">` : ''}` +
+        `<span class="cd-code">${code.toUpperCase()}</span>` +
+        `<span class="cd-n">(${n})</span>`);
       opt.addEventListener('click', () => { closeCountryDropdown(); country = code; renderPills(); rerenderList(); });
       dropdown.appendChild(opt);
     }
