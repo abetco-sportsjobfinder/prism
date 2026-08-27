@@ -342,7 +342,11 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
     for (const [code, n] of topCC) {
       const f = flagFor(code);
       const opt = el('div', 'country-dropdown-item',
-        `${f ? `<img class="cd-flag" src="${f}" alt="" loading="lazy" onerror="this.remove()">` : ''}` +
+        // NOT loading="lazy". The menu opens below the fold, so lazy defers
+        // these indefinitely — complete stays false and naturalWidth 0, which
+        // is why the first attempt showed 15 <img> tags and zero visible flags.
+        // Fifteen 20x14 assets are nothing to fetch eagerly.
+        `${f ? `<img class="cd-flag" src="${f}" alt="" onerror="this.remove()">` : ''}` +
         `<span class="cd-code">${code.toUpperCase()}</span>` +
         `<span class="cd-n">(${n})</span>`);
       opt.addEventListener('click', () => { closeCountryDropdown(); country = code; renderPills(); rerenderList(); });
