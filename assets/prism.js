@@ -29,13 +29,20 @@ function loadScript(src) {
 }
 const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const CHIP_CSS = `.abet-chip-perspective{perspective:620px;width:56px;height:56px}.abet-chip-spinner{width:100%;height:100%;position:relative;transform-style:preserve-3d;animation:abet-chip-flip 2.4s cubic-bezier(.45,.05,.35,1) infinite}.abet-chip-face{position:absolute;inset:0;border-radius:50%;background:#0b0f17;display:flex;align-items:center;justify-content:center;backface-visibility:hidden}.abet-chip-seg{position:absolute;left:50%;top:4px;width:9px;height:15px;margin-left:-4.5px;border-radius:3px;background:rgba(253,181,21,0.85)}.abet-chip-txt{font-family:Georgia,'Times New Roman',serif;font-size:13px;letter-spacing:1px;color:#FDB515;text-shadow:0 0 8px rgba(253,181,21,.65)}.abet-chip-back{transform:rotateY(180deg)}@keyframes abet-chip-flip{0%{transform:rotateY(0deg) translateY(0)}45%{transform:rotateY(540deg) translateY(-10px)}70%{transform:rotateY(720deg) translateY(0)}78%{transform:rotateY(720deg) translateY(-4px)}100%{transform:rotateY(1080deg) translateY(0)}}`;
+const CHIP_CSS = `.abet-chip-perspective{perspective:620px;width:76px;height:76px}.abet-chip-spinner{width:100%;height:100%;position:relative;transform-style:preserve-3d;animation:abet-chip-flip 2.4s cubic-bezier(.45,.05,.35,1) infinite}.abet-chip-face{position:absolute;inset:0;border-radius:50%;display:grid;place-items:center;backface-visibility:hidden;border:3px solid #FDB515;outline:1px solid rgba(253,181,21,0.45);outline-offset:-5px;background:radial-gradient(circle at 30% 24%,rgba(255,255,255,0.16),transparent 34%),radial-gradient(circle at 68% 78%,rgba(253,181,21,0.10),transparent 40%),radial-gradient(circle at 34% 30%,#29405a 0%,#16222f 45%,#0d131c 68%,#070B0F 100%);box-shadow:0 0 28px rgba(253,181,21,0.34),0 0 64px rgba(253,181,21,0.12),inset 0 0 18px rgba(253,181,21,0.14),inset 0 2px 6px rgba(0,0,0,0.65)}.abet-chip-seg{position:absolute;left:50%;top:2px;width:8px;height:10px;margin-left:-4px;border-radius:3px;background:linear-gradient(180deg,rgba(255,214,102,1) 0%,rgba(253,181,21,0.92) 45%,rgba(180,120,8,0.9) 100%);box-shadow:inset 0 1px 1px rgba(255,255,255,0.45),inset 0 -1px 2px rgba(80,50,0,0.6);transform-origin:50% 36.0px}.abet-chip-txt{font-family:'Times New Roman',serif;font-weight:700;font-size:43px;line-height:.88;transform:translateY(-1px);color:#FDB515;text-shadow:0 0 6px rgba(253,181,21,0.95),0 0 22px rgba(253,181,21,0.55),0 0 42px rgba(253,181,21,0.28)}.abet-chip-back{transform:rotateY(180deg)}.abet-chip-loader{display:flex;flex-direction:column;align-items:center;gap:16px;padding:38px 0}@keyframes abet-chip-flip{0%{transform:rotateY(0deg) translateY(0)}45%{transform:rotateY(540deg) translateY(-10px)}70%{transform:rotateY(720deg) translateY(0)}78%{transform:rotateY(720deg) translateY(-3px)}86%{transform:rotateY(720deg) translateY(0)}100%{transform:rotateY(720deg) translateY(0)}}@media (prefers-reduced-motion:reduce){.abet-chip-spinner{animation:none !important}}`;
 let _chipCssDone = false;
 const chipHTML = () => {
   const css = _chipCssDone ? '' : `<style>${CHIP_CSS}</style>`;
   _chipCssDone = true;
   const segs = Array.from({length:8},(_,o)=>`<span class="abet-chip-seg" style="transform:rotate(${o*45}deg)"></span>`).join('');
-  return `${css}<div class="abet-chip-loader" role="status" aria-live="polite"><div class="abet-chip-perspective"><div class="abet-chip-spinner"><div class="abet-chip-face">${segs}<span class="abet-chip-txt">ABET</span></div><div class="abet-chip-face abet-chip-back">${segs}<span class="abet-chip-txt">ABET</span></div></div></div></div>`;
+  // THE MARK IS THE ALPHA GLYPH, NOT THE WORD "ABET".
+  // This carried the literal string ABET in Georgia (13px, no rim) until
+  // 2026-10-01 — the older generic chip. The canonical ABET loading mark is
+  // the alpha, matching the dashboard wordmark (.app-logo-alpha) and
+  // AbetChipLoader.jsx; chip geometry here is ported verbatim from the ABET TV
+  // build. Both faces carry it so it stays legible mid-flip.
+  const mark = '<span class="abet-chip-txt">&#x03B1;</span>';
+  return `${css}<div class="abet-chip-loader" role="status" aria-live="polite"><div class="abet-chip-perspective"><div class="abet-chip-spinner"><div class="abet-chip-face">${segs}${mark}</div><div class="abet-chip-face abet-chip-back">${segs}${mark}</div></div></div></div>`;
 };
 const proxied = url => `${PROXY}?u=${encodeURIComponent(url)}`;
 function rawOf(u) {
@@ -210,7 +217,12 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
   let ALL = [];
   let CUR = [];
   let rendered = 0;
-  let activeCat = 'all';
+  // Category deep-link: ?cat=sports lands on the SPORTS pill instead of ALL.
+  // Additive — an absent or unknown value leaves the previous 'all' default,
+  // so every existing link keeps behaving exactly as before.
+  const _catParam = (new URLSearchParams(location.search).get('cat') || '')
+    .trim().toLowerCase();
+  let activeCat = _catParam || 'all';
   // Default ON: the page opens showing only channels with a verified working
   // stream. The pill still toggles it off.
   let workingOnly = true;
@@ -392,7 +404,16 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
   /* ---------- channel rendering ---------- */
   function currentList() {
     let out = ALL;
-    if (workingOnly) out = out.filter(c => hasStream(c.id) && getStatus(c.id) === 'working');
+    if (workingOnly) {
+      // WORKING ONLY = "hide what is PROVEN dead", not "show only what was
+      // verified" (2026-10-01, same semantics as the ABET TV build). The probe
+      // shortlist covers a few thousand channels, so the old verified-only
+      // rule blanked whole categories — SPORTS showed 0 rows while CBS Sports
+      // was playing. Unknown means unchecked, not broken; the row dot still
+      // shows the probe verdict, and an empty status map degrades to "show
+      // everything with a stream" instead of an empty list.
+      out = out.filter(c => hasStream(c.id) && getStatus(c.id) !== 'dead');
+    }
     if (country !== 'all') out = out.filter(c => c.country === country);
     if (activeCat !== 'all')
       out = out.filter(c => (c.categories || []).map(x => x.toLowerCase()).includes(activeCat));
@@ -460,12 +481,36 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
         chList.replaceChildren(el('div', 'list-boot', `${chipHTML()}<div>${esc(m || 'loading…')}</div></div>`));
       });
       ALL = [...db.channels].sort((a, b) =>
-        ((hasStream(b.id) ? 0 : 1) - (hasStream(a.id) ? 0 : 1)) ||
+        // Playable channels first. This term is a PENALTY (0 = has a stream,
+        // 1 = does not), so ascending order is penalty(a) - penalty(b).
+        // It read (b) - (a) until 2026-08-29, which sorted the playable
+        // channel LAST: with a playable and b not, that is 1 - 0 = +1, and a
+        // positive return puts `a` after `b`. Being non-zero it also
+        // short-circuited the `a.rank - b.rank` tiebreak below, which encodes
+        // the same thing correctly and would otherwise have hidden it.
+        // Invisible while WORKING-ONLY is on, because that filter drops every
+        // streamless channel before the order is ever seen. 9,966 of 40,834
+        // channels have a stream.
+        ((hasStream(a.id) ? 0 : 1) - (hasStream(b.id) ? 0 : 1)) ||
         (a.rank - b.rank) || a.name.localeCompare(b.name));
       renderPills();
       rerenderList();
+      // A deep-linked category is pointless behind a collapsed section.
+      // Must go through setOpen(), and must run AFTER rerenderList() so
+      // appendChunk() has a filtered list to draw from.
+      if (_catParam) setOpen(true);
       requestLogos(() => refreshLogos());
-      list.appendChild(sentinel);
+      // `list` was never declared anywhere in this file — the container is
+      // `chList` (line ~203). The ReferenceError it threw was caught by the
+      // handler below, which set the count to "catalog offline" and replaced
+      // the freshly rendered rows with an error message. Two consequences:
+      //   1. the page loaded showing "⚠ list is not defined" instead of the
+      //      channel list, on every visit;
+      //   2. the IntersectionObserver sentinel was never appended or observed,
+      //      so infinite scroll never worked at all.
+      // It hid because touching any filter calls rerenderList() again and
+      // repaints over the error, so the list appears the moment you interact.
+      chList.appendChild(sentinel);
       io.observe(sentinel);
     } catch (e) {
       countEl.textContent = 'catalog offline';
