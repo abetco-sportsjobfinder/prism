@@ -12,13 +12,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # cloudflare/pages-action was unpublished by Cloudflare (first failure
+      # 2026-10-01: "Unable to resolve action cloudflare/pages-action, not
+      # found"), which silently broke this workflow for a month. wrangler-action
+      # is the maintained successor and deploys the checked-out tree. The
+      # 2026-10-01 release was pushed manually via `wrangler pages deploy`.
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: prism-tv
-          directory: .
+          command: pages deploy . --project-name=prism-tv --branch=main
 
       - name: Verify live
         run: |
