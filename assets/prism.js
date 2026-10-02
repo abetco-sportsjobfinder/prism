@@ -196,6 +196,7 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
     <button class="collapse-header" id="secHeader">
       <span class="collapse-chevron" id="secChev">▸</span>
       <span class="collapse-title">CHANNELS</span>
+      <span class="dot-matrix-container"><span class="dot-matrix-scroll" id="tickerScroll"></span></span>
       <span class="collapse-count" id="chCount"></span>
     </button>
     <div class="collapse-body" id="collapseBody">
@@ -204,6 +205,44 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
       <div class="list-more-wrap"><button class="list-more" id="listMore">SHOW MORE</button></div>
     </div>`;
   target.appendChild(section);
+
+  /* ---------- dot-matrix ticker (collapse header) ----------
+     Ported from the prism 'Piece 000' header. Feed copy is a static
+     feature-ad loop for the ABET dashboard modules; when a real news feed
+     exists, set TICKER_FEED from a fetch() and re-render on arrival — the
+     ticker already re-renders whenever data lands. */
+  const TICKER_FEED = [
+    'PRISM - ANY STREAM, ANY SCREEN',
+    'LIVE ODDS - CROSS-BOOK PRICES, EV, ARBITRAGE',
+    'MLB INTELLIGENCE - LINEUPS, PITCHERS, PREDICTIONS',
+    'MARKET EXPLORER - EVERY SPORT, EVERY MARKET',
+    'STATS LAB - ANALYTICS ACROSS 7 SPORTS',
+    'MODEL RESEARCH - BACKTESTS + WALK-FORWARD EVIDENCE',
+    'PORTFOLIO - STRATEGY ROI, DRAWDOWN, ALLOCATION',
+    'OPERATIONS - SOURCE HEALTH + INCIDENT PROOF',
+    'SPORTSBOOK JOBS - INDUSTRY CAREER RADAR',
+  ];
+  const tickerScroll = section.querySelector('#tickerScroll');
+  function renderTicker() {
+    if (!tickerScroll) return;
+    try {
+      const s = stats();
+      const working = s.working > 0
+        ? `${s.working.toLocaleString()} VERIFIED WORKING`
+        : 'PROBE MAP WARMING UP';
+      const sports = db.channels.reduce((n, c) =>
+        n + ((c.categories || []).some(k => k.toLowerCase() === 'sports') ? 1 : 0), 0);
+      const items = [
+        ...TICKER_FEED,
+        `${db.channels.length.toLocaleString()} CHANNELS INDEXED`,
+        `${s.ready.toLocaleString()} WITH STREAMS`,
+        working,
+        `${sports.toLocaleString()} SPORTS CHANNELS`,
+      ];
+      const group = items.map(t => `<span>${esc(t)}</span><span class="separator">&#9670;</span>`).join('');
+      tickerScroll.innerHTML = group + group;
+    } catch (e) {}
+  }
 
   /* ---------- refs / state ---------- */
   const pillBar = section.querySelector('#pillBar');
@@ -476,10 +515,20 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
 
   (async () => {
     try {
-      await loadCatalog(m => {
-        countEl.textContent = m || 'loading…';
-        chList.replaceChildren(el('div', 'list-boot', `${chipHTML()}<div>${esc(m || 'loading…')}</div></div>`));
-      });
+      await loadCatalog(
+        m => {
+          countEl.textContent = m || 'loading…';
+          chList.replaceChildren(el('div', 'list-boot', `${chipHTML()}<div>${esc(m || 'loading…')}</div></div>`));
+        },
+        // onStatus: /shortlist + /api/status resolve AFTER loadCatalog returns
+        // and mutate db.status; nothing redraws on its own (the same missing
+        // callback fixed on the ABET TV build), so the dots and the ticker
+        // stayed stale until the user touched a filter.
+        () => {
+          if (!ALL.length) return;
+          renderPills(); rerenderList(); renderTicker();
+        },
+      );
       ALL = [...db.channels].sort((a, b) =>
         // Playable channels first. This term is a PENALTY (0 = has a stream,
         // 1 = does not), so ascending order is penalty(a) - penalty(b).
@@ -495,6 +544,7 @@ export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SO
         (a.rank - b.rank) || a.name.localeCompare(b.name));
       renderPills();
       rerenderList();
+      renderTicker();
       // A deep-linked category is pointless behind a collapsed section.
       // Must go through setOpen(), and must run AFTER rerenderList() so
       // appendChunk() has a filtered list to draw from.

@@ -39,11 +39,17 @@ body {
   position: relative;
   border-radius: 18px; overflow: hidden;
   background: #000;
-  border: 1px solid rgba(0, 184, 212, 0.15);
+  /* SUNK, not floating: dark rim, deep inset well, bottom lip highlight.
+     Deliberately the opposite treatment of the embossed pills/containers —
+     the screen reads as a seat cut into the surface. */
+  border: 1px solid rgba(0, 0, 0, 0.65);
+  border-top-color: rgba(0, 0, 0, 0.85);
   box-shadow:
-    inset 0 3px 12px rgba(0, 0, 0, 0.7),
-    inset 0 -2px 8px rgba(0, 184, 212, 0.08),
-    0 4px 20px rgba(0, 184, 212, 0.1);
+    inset 0 6px 18px rgba(0, 0, 0, 0.85),
+    inset 0 -3px 10px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 24px rgba(0, 0, 0, 0.35);
   aspect-ratio: 16 / 9;
 }
 .player-shell video { width: 100%; height: 100%; object-fit: contain; display: block; }
@@ -91,9 +97,16 @@ body {
 .collapse-section {
   margin: 10px 12px 0;
   border: 1px solid var(--border-color);
+  border-bottom-color: rgba(0, 0, 0, 0.7);
   border-radius: 12px;
   overflow: hidden;
-  background: var(--bg-darker);
+  /* EMBOSSED like the pills: lit top edge, depth underneath, lifted shadow. */
+  background: linear-gradient(180deg, rgba(255,255,255,.05) 0%, rgba(255,255,255,.015) 40%, rgba(0,0,0,.2) 100%), var(--bg-darker);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.12),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.4),
+    0 2px 0 rgba(0, 0, 0, 0.55),
+    0 8px 18px rgba(0, 0, 0, 0.35);
 }
 @media (min-width: 900px) { .collapse-section { max-width: 1100px; margin: 10px auto 0; } }
 
@@ -109,6 +122,22 @@ body {
 .collapse-chevron { font-size: 13px; color: var(--accent-primary); width: 18px; text-align: center; flex-shrink: 0; }
 .collapse-title { color: var(--accent-secondary); font-weight: 700; font-size: 13px; letter-spacing: 1.5px; flex-shrink: 0; }
 .collapse-count { margin-left: auto; font-size: 11px; color: var(--text-muted); letter-spacing: .5px; }
+
+/* ---------- dot-matrix news ticker (collapse header) ----------
+   Ported from the prism 'Piece 000' header; items are live catalog/probe
+   numbers, rebuilt by renderTicker() whenever data lands. */
+.dot-matrix-container { flex: 1; overflow: hidden; margin: 0 10px; position: relative; height: 16px; min-width: 0; }
+.dot-matrix-scroll {
+  display: inline-block; white-space: nowrap;
+  animation: dotMatrixScroll 60s linear infinite;
+  font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--accent-primary);
+  text-shadow: 0 0 8px var(--accent-primary), 0 0 2px var(--accent-primary);
+}
+@keyframes dotMatrixScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+.dot-matrix-scroll .separator { color: var(--text-muted); opacity: .6; margin: 0 12px; }
+@media (prefers-reduced-motion: reduce) { .dot-matrix-scroll { animation: none; } }
+@media (max-width: 640px) { .dot-matrix-container { display: none; } }
 
 .collapse-body { max-height: 65vh; overflow-y: auto; }
 .collapse-section:not(.open) .collapse-body { display: none; }
