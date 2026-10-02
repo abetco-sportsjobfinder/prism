@@ -54,26 +54,6 @@ body {
 }
 .player-shell video { width: 100%; height: 100%; object-fit: contain; display: block; }
 
-/* YouTube embed surface: sits on top of <video> only while shown */
-.player-shell .yt-frame {
-  position: absolute; inset: 0; z-index: 3;
-  width: 100%; height: 100%; border: 0; display: none;
-  background: #000;
-}
-.player-shell .yt-frame.show { display: block; }
-
-/* red YT source badge + gold FULL-episodes badge in channel rows */
-.ch-badge-yt {
-  flex-shrink: 0; font-size: 8px; font-weight: 700; letter-spacing: .05em;
-  color: #fff; background: #c4302b; border-radius: 4px;
-  padding: 1px 4px; margin-right: 6px;
-}
-.ch-badge-full {
-  flex-shrink: 0; font-size: 8px; font-weight: 700; letter-spacing: .05em;
-  color: #090D14; background: #FDB515; border-radius: 4px;
-  padding: 1px 4px; margin-left: 6px;
-}
-
 .player-loading {
   position: absolute; inset: 0; z-index: 4;
   display: flex; align-items: center; justify-content: center;
@@ -172,38 +152,16 @@ body {
 .pill-bar::-webkit-scrollbar { display: none; }
 .cat-pill {
   flex-shrink: 0;
-  border: 1px solid var(--border-color); border-bottom-color: rgba(0,0,0,.7);
+  background: var(--menu-bg); border: 1px solid var(--border-color);
   color: var(--text-light); font-family: inherit; font-size: 11px; font-weight: 600;
-  letter-spacing: 1px; text-transform: uppercase; text-shadow: 0 1px 1px rgba(0,0,0,.7);
+  letter-spacing: 1px; text-transform: uppercase;
   min-height: 36px; padding: 0 14px; border-radius: 18px;
-  cursor: pointer; transition: box-shadow .15s, transform .05s, background .2s;
-  white-space: nowrap;
-  /* embossed 3D: light edge on top, depth under the pill, lift off the bar */
-  background: linear-gradient(180deg, rgba(255,255,255,.13) 0%, rgba(255,255,255,.03) 45%, rgba(0,0,0,.28) 100%), var(--menu-bg);
-  box-shadow:
-    inset 0 1px 1px rgba(255,255,255,.22),
-    inset 0 -2px 4px rgba(0,0,0,.5),
-    0 2px 0 rgba(0,0,0,.6),
-    0 4px 8px rgba(0,0,0,.35);
+  cursor: pointer; transition: all .2s; white-space: nowrap;
 }
-.cat-pill:hover {
-  background: linear-gradient(180deg, rgba(255,255,255,.2) 0%, rgba(255,255,255,.06) 45%, rgba(0,0,0,.3) 100%), var(--menu-bg);
-  border-color: var(--accent-primary);
-}
-.cat-pill:active {
-  transform: translateY(2px);
-  box-shadow: inset 0 2px 6px rgba(0,0,0,.65), inset 0 -1px 0 rgba(255,255,255,.1);
-}
+.cat-pill:hover { background: rgba(0,184,212,.25); }
 .cat-pill.on {
-  background: linear-gradient(180deg, rgba(255,255,255,.35) 0%, rgba(255,255,255,.08) 45%, rgba(0,0,0,.18) 100%), var(--accent-secondary);
-  border-color: var(--accent-secondary); border-bottom-color: rgba(0,0,0,.55);
-  color: var(--bg-dark); text-shadow: 0 1px 0 rgba(255,255,255,.35);
-  box-shadow:
-    inset 0 1px 1px rgba(255,255,255,.55),
-    inset 0 -2px 4px rgba(0,0,0,.3),
-    0 2px 0 rgba(0,0,0,.5),
-    0 4px 10px rgba(0,0,0,.4),
-    0 0 12px rgba(255,214,0,.45);
+  background: var(--accent-secondary); border-color: var(--accent-secondary);
+  color: var(--bg-dark); box-shadow: 0 0 10px rgba(255,214,0,.4);
 }
 
 /* ---------- channel rows ---------- */
@@ -298,28 +256,12 @@ select { color-scheme: dark; }
 }
 
 
-/* ---------- ABET chip loader (verbatim from live bundle) ---------- */
-.abet-chip-perspective { perspective: 620px; width: 56px; height: 56px; }
-.abet-chip-spinner { width:100%; height:100%; position:relative; transform-style:preserve-3d; animation:abet-chip-flip 2.4s cubic-bezier(.45,.05,.35,1) infinite; }
-.abet-chip-face { position:absolute; inset:0; border-radius:50%; display:flex; align-items:center; justify-content:center; backface-visibility:hidden;
-  /* matched to AbetChipLoader.jsx: 3px gold rim, radial-lit face, gold bloom. */
-  border:3px solid #FDB515;
-  background:radial-gradient(circle at 34% 30%, #1b2431 0%, #0d131c 62%, #070B0F 100%);
-  box-shadow:0 0 24px rgba(253,181,21,0.28), inset 0 0 16px rgba(253,181,21,0.10); }
-.abet-chip-seg { position:absolute; left:50%; top:5px; width:9px; height:16px; margin-left:-4.5px; border-radius:3px; background:rgba(253,181,21,0.85); }
-/* The alpha glyph. Times New Roman, sized off the 56px chip the same way
-   AbetChipLoader sizes it (0.52 of the chip), so the two marks are identical. */
-.abet-chip-txt { font-family:'Times New Roman',serif; font-weight:700; font-size:29px;
-  line-height:.88; transform:translateY(-2px); color:#FDB515;
-  text-shadow:0 0 18px rgba(253,181,21,.5); }
-.abet-chip-back { transform:rotateY(180deg); }
-@keyframes abet-chip-flip {
-  0% { transform:rotateY(0deg) translateY(0); }
-  45% { transform:rotateY(540deg) translateY(-10px); }
-  70% { transform:rotateY(720deg) translateY(0); }
-  78% { transform:rotateY(720deg) translateY(-4px); }
-  100% { transform:rotateY(1080deg) translateY(0); }
-}
+/* ---------- ABET chip loader ----------
+   Styling is injected by chipHTML() in prism.js as the single source of truth:
+   the canonical alpha chip, ported verbatim from the ABET TV build (76px,
+   gold rim, radial-lit face, alpha glyph). The static rules that lived here
+   were a stale older copy (56px chip, "ABET" wordmark, no rim) and this file
+   could not keep two versions in sync. */
 .chip-label { font-size:11px; letter-spacing:1.5px; color:var(--text-muted); text-transform:uppercase; margin-left:12px; }
 
 /* ---------- pill bar additions ---------- */
@@ -383,54 +325,3 @@ select { color-scheme: dark; }
             height: 14px; font-size: 12px; line-height: 1; }
 .cd-code { flex: 1; }
 .cd-n { color: var(--text-muted); font-size: 10px; flex-shrink: 0; }
-
-/* ── ABET TV brand bar ─────────────────────────────────────────────────────
-   The alpha IS the logo. Matches .hp-alpha on the dashboard homepage and the
-   chip loader mark, so the identity reads the same on every surface. */
-.brand-bar {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  padding: 14px 16px 10px;
-  max-width: 100%;
-}
-.brand-mark {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 1px;
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: -.01em;
-  line-height: 1;
-  text-decoration: none;
-  color: inherit;
-  cursor: pointer;
-}
-.brand-mark:hover .brand-word { color: #FDB515; }
-.brand-mark:focus-visible { outline: 2px solid #FDB515; outline-offset: 3px; border-radius: 4px; }
-.brand-alpha {
-  font-family: 'Times New Roman', Times, serif;
-  font-size: 1.24em;
-  font-weight: 700;
-  color: #FDB515;
-  text-shadow: 0 0 18px rgba(253, 181, 21, .28);
-  line-height: 1;
-}
-.brand-word { color: #E6F4FF; }
-.brand-tv {
-  margin-left: 8px;
-  font-weight: 600;
-  font-size: .82em;
-  letter-spacing: .12em;
-  color: #FDB515;
-}
-.brand-tag {
-  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
-  font-size: .68rem;
-  letter-spacing: .05em;
-  color: #8a9aaf;
-}
-@media (max-width: 560px) {
-  .brand-tag { display: none; }
-  .brand-bar { padding: 12px 12px 8px; }
-}

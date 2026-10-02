@@ -185,18 +185,6 @@ function showMuteBadge(shell) {
 export function mountPrism({ target, title = 'prism', defaultSource = DEFAULT_SOURCE } = {}) {
   document.title = title;
 
-  /* ---------- brand bar ----------
-     Same mark as the ABET TV build and the chip loader: the alpha IS the
-     logo. The wordmark is a SELF-LINK (href="" reloads the current URL).
-     Added 2026-10-02 for visual parity with abet-tv.pages.dev. */
-  const brand = el('div', 'brand-bar');
-  brand.innerHTML = `
-    <a class="brand-mark" href="" title="Reload ABET TV">
-      <span class="brand-alpha">&#x03B1;</span><span class="brand-word">bet</span><span class="brand-tv">TV</span>
-    </a>
-    <span class="brand-tag">live channels, any screen</span>`;
-  target.appendChild(brand);
-
   /* ---------- player ---------- */
   const stage = el('div', 'stage');
   target.appendChild(stage);

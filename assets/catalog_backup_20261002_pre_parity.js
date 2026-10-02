@@ -191,15 +191,6 @@ export function hierarchy(channels) {
 }
 
 /* main loader: onProgress(stage string) fires as it goes */
-/* iptv-org tags adult channels with the category id 'xxx'. They do not exist
-   for this product: filtered at ingest, so they never enter db.channels,
-   never get a category pill, and never appear in any list or count —
-   regardless of filters, WORKING-ONLY state, or URL parameters. (Surfaced on
-   the ABET TV build 2026-09-27 as a visible 'XXX' pill and removed the same
-   day; prism kept its own catalog copy and never got the fix — ported here
-   2026-10-02.) */
-const isNsfw = c => (c.categories || []).some(k => String(k).toLowerCase() === 'xxx');
-
 export async function loadCatalog(onProgress = () => {}, onStatus = () => {}) {
   onProgress('fetching channel index…');
   const [channelsData, streamsData] = await Promise.all([
@@ -210,7 +201,7 @@ export async function loadCatalog(onProgress = () => {}, onStatus = () => {}) {
   onProgress(`indexing ${streamsData.length.toLocaleString()} streams…`);
   db.totalIndexed = channelsData.length;
 
-  const byId = new Map(channelsData.filter(c => !isNsfw(c)).map(c => [c.id, {
+  const byId = new Map(channelsData.map(c => [c.id, {
     id: c.id, name: c.name, country: c.country || '',
     categories: c.categories || [], source: 'iptvorg',
   }]));
@@ -218,7 +209,6 @@ export async function loadCatalog(onProgress = () => {}, onStatus = () => {}) {
   for (const s of streamsData) {
     if (!s.url || !/^https?:\/\//.test(s.url)) continue;
     if (/youtube\.com|\.mpd(\?|$)/i.test(s.url)) continue;
-    if (!byId.has(s.channel)) continue;   // incl. adult channels (never indexed)
     if (!db.streamsByChannel.has(s.channel)) db.streamsByChannel.set(s.channel, []);
     db.streamsByChannel.get(s.channel).push({ url: s.url });
   }
